@@ -1,2 +1,2 @@
-import { isConfigured } from "@/lib/env";
-export function GET(){return Response.json({status:"ok",service:"campus-exchange-web",dependencies:{supabaseConfigured:isConfigured()}},{headers:{"cache-control":"no-store"}})}
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+export async function GET(){try{const db=createSupabaseAdminClient();const started=performance.now();const {error}=await db.rpc("public_stats");if(error)throw error;return Response.json({status:"ok",service:"campus-exchange-web",dependencies:{database:"ok"},latencyMs:Math.round(performance.now()-started)},{headers:{"cache-control":"no-store"}})}catch{return Response.json({status:"degraded",service:"campus-exchange-web",dependencies:{database:"unavailable"}},{status:503,headers:{"cache-control":"no-store"}})}}

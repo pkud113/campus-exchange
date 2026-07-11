@@ -1,0 +1,5 @@
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_REPLACE_ME
+RESEND_API_KEY=re_REPLACE_ME
+EMAIL_FROM=Campus Exchange <notifications@updates.campus-exchange.net>
+APP_ORIGIN=https://campus-exchange.net

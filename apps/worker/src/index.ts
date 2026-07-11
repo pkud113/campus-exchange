@@ -18,6 +18,14 @@ type OutboxEvent = {
   attempt_count: number;
 };
 
+async function deterministicNotificationId(eventId: string, recipientId: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${eventId}:${recipientId}`)));
+  digest[6] = (digest[6]! & 0x0f) | 0x50;
+  digest[8] = (digest[8]! & 0x3f) | 0x80;
+  const hex = Array.from(digest.slice(0, 16), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env: Env) {
   const conversationId = event.payload.conversationId;
   const senderId = event.payload.senderId;
@@ -28,23 +36,30 @@ async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env
     const recipientId = participant.profile_id as string;
     const { data: blocked } = await db.from("blocks").select("blocker_id").or(`and(blocker_id.eq.${recipientId},blocked_id.eq.${senderId}),and(blocker_id.eq.${senderId},blocked_id.eq.${recipientId})`).maybeSingle();
     if (blocked) continue;
-    await db.from("notifications").upsert({
-      id: crypto.randomUUID(), campus_id: event.campus_id, profile_id: recipientId,
-      kind: "message", title: "New marketplace message", body: "A student sent you a message.", href: `/messages/${conversationId}`
-    }, { onConflict: "id" });
+    const notificationId = await deterministicNotificationId(event.id, recipientId);
+    const { error: notificationError } = await db.from("notifications").upsert({
+      id: notificationId, campus_id: event.campus_id, profile_id: recipientId, source_event_id: event.id,
+      kind: "message", title: "New marketplace message", body: "A student sent you a message.", href: `/messages?conversation=${conversationId}`
+    }, { onConflict: "profile_id,source_event_id" });
+    if (notificationError) throw notificationError;
     // Email is intentionally generic: private message text never enters logs or email payloads.
     if (env.RESEND_API_KEY && env.EMAIL_FROM) {
       const { data: userData } = await db.auth.admin.getUserById(recipientId);
       if (userData.user?.email) {
         const resend = new Resend(env.RESEND_API_KEY);
-        await resend.emails.send({ from: env.EMAIL_FROM, to: userData.user.email, subject: "New message on Campus Exchange", html: `<p>You have a new marketplace message.</p><p><a href="${env.APP_ORIGIN}/messages/${conversationId}">Open Campus Exchange</a></p>` });
+        const delivery = await resend.emails.send(
+          { from: env.EMAIL_FROM, to: userData.user.email, subject: "New message on Campus Exchange", html: `<p>You have a new marketplace message.</p><p><a href="${env.APP_ORIGIN}/messages?conversation=${conversationId}">Open Campus Exchange</a></p>` },
+          { idempotencyKey: `message-${event.id}-${recipientId}` }
+        );
+        if (delivery.error) throw new Error(`Resend delivery failed: ${delivery.error.name}`);
       }
     }
   }
 }
 
 async function processEvent(db: SupabaseClient, event: OutboxEvent, env: Env) {
-  if (event.event_type === "message.created") await deliverMessageCreated(db, event, env);
+  if (event.event_type === "message.created") return deliverMessageCreated(db, event, env);
+  throw new Error(`unsupported outbox event: ${event.event_type}`);
 }
 
 async function runBatch(env: Env): Promise<number> {

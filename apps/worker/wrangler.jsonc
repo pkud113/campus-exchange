@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "campus-exchange-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-07-05",
+  "compatibility_date": "2026-07-08",
   "compatibility_flags": ["nodejs_compat"],
   "triggers": { "crons": ["*/1 * * * *"] },
   "limits": { "cpu_ms": 30000 },

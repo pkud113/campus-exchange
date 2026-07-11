@@ -1,0 +1,106 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      APP_ORIGIN: https://campus-exchange.net
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate deployment credentials
+        shell: bash
+        run: |
+          required=(NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF SUPABASE_SECRET_KEY TURNSTILE_SECRET_KEY NEXT_PUBLIC_TURNSTILE_SITE_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID RESEND_API_KEY EMAIL_FROM)
+          for key in "${required[@]}"; do
+            if [ -z "${!key}" ]; then
+              echo "Missing GitHub production secret: $key" >&2
+              exit 1
+            fi
+          done
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Apply production database migrations
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --include-all
+
+      - name: Ensure private media bucket exists
+        shell: bash
+        run: |
+          if ! pnpm --dir apps/worker exec wrangler r2 bucket list | grep -q 'campus-exchange-media'; then
+            pnpm --dir apps/worker exec wrangler r2 bucket create campus-exchange-media
+          fi
+
+      - name: Deploy web application
+        run: pnpm --filter @campus-exchange/web deploy
+
+      - name: Configure web runtime secrets
+        shell: bash
+        run: |
+          printf '%s' "$NEXT_PUBLIC_SUPABASE_URL" | pnpm --dir apps/worker exec wrangler secret put NEXT_PUBLIC_SUPABASE_URL --name campus-exchange-web
+          printf '%s' "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | pnpm --dir apps/worker exec wrangler secret put NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY --name campus-exchange-web
+          printf '%s' "$SUPABASE_SECRET_KEY" | pnpm --dir apps/worker exec wrangler secret put SUPABASE_SECRET_KEY --name campus-exchange-web
+          printf '%s' "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" | pnpm --dir apps/worker exec wrangler secret put NEXT_PUBLIC_TURNSTILE_SITE_KEY --name campus-exchange-web
+          printf '%s' "$TURNSTILE_SECRET_KEY" | pnpm --dir apps/worker exec wrangler secret put TURNSTILE_SECRET_KEY --name campus-exchange-web
+          printf '%s' "$APP_ORIGIN" | pnpm --dir apps/worker exec wrangler secret put APP_ORIGIN --name campus-exchange-web
+
+      - name: Deploy background worker
+        run: pnpm --filter @campus-exchange/worker deploy
+
+      - name: Configure worker runtime secrets
+        shell: bash
+        run: |
+          printf '%s' "$NEXT_PUBLIC_SUPABASE_URL" | pnpm --dir apps/worker exec wrangler secret put SUPABASE_URL --name campus-exchange-worker
+          printf '%s' "$SUPABASE_SECRET_KEY" | pnpm --dir apps/worker exec wrangler secret put SUPABASE_SECRET_KEY --name campus-exchange-worker
+          printf '%s' "$RESEND_API_KEY" | pnpm --dir apps/worker exec wrangler secret put RESEND_API_KEY --name campus-exchange-worker
+          printf '%s' "$EMAIL_FROM" | pnpm --dir apps/worker exec wrangler secret put EMAIL_FROM --name campus-exchange-worker
+          printf '%s' "$APP_ORIGIN" | pnpm --dir apps/worker exec wrangler secret put APP_ORIGIN --name campus-exchange-worker
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error https://campus-exchange.net/api/health; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1

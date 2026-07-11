@@ -2,18 +2,18 @@
 
 ## Environments and release flow
 
-- Local development uses the Supabase CLI and seed domain `students.demo.edu`.
+- Local development uses the Supabase CLI and a development-only seed campus.
 - Pull requests run type checks, unit tests, the Next.js build, and the Worker dry-run build.
 - Preview deployments use a non-production Supabase project. Production secrets must never be exposed to previews.
-- Production deploys the web Worker, applies reviewed SQL migrations, runs smoke tests, then deploys the outbox Worker.
-- Replace the demo campus and email domain before inviting any users.
+- Production deployment is manual through the `Deploy production` GitHub Actions workflow. It verifies the repository, applies reviewed SQL migrations, creates the private media bucket, deploys both Workers, installs runtime secrets, and runs a health check.
+- The production campus is Michigan State University, accepts only `msu.edu`, and uses `America/Detroit`.
 
 ## Required production controls
 
 1. Enable Supabase Pro spend cap and seven-day backups.
 2. Set Cloudflare Worker CPU limits and billing alerts at $50 and $75 projected monthly spend.
 3. Configure Turnstile on the sign-in page and set `TURNSTILE_SECRET_KEY`.
-4. Store `SUPABASE_SECRET_KEY`, `RESEND_API_KEY`, and `CRON_SECRET` only as encrypted deployment secrets.
+4. Store `SUPABASE_SECRET_KEY`, `RESEND_API_KEY`, database credentials, Turnstile credentials, and Cloudflare credentials only as encrypted GitHub production-environment secrets.
 5. Require MFA for every account assigned `moderator` or `admin`; remove assignments immediately when staff leave.
 6. Configure the R2 bucket as private. Only the authenticated media route may read it.
 7. Set Resend SPF, DKIM, and DMARC before using school-email OTP in production.

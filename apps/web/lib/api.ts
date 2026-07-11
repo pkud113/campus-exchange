@@ -38,6 +38,8 @@ export async function requireStaff(request: Request, allowed: string[] = ["moder
   if (context instanceof NextResponse) return context;
   const { data } = await context.supabase.from("role_assignments").select("role").eq("profile_id", context.userId).in("role", allowed);
   if (!data?.length) return apiError(request, 403, "forbidden", "Moderator access is required.");
+  const {data:aal}=await context.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(aal?.currentLevel!=="aal2")return apiError(request,403,"forbidden","Multi-factor authentication is required for staff actions.");
   return context;
 }
 
