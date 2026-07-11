@@ -1,0 +1,75 @@
+import { NextResponse } from "next/server";
+import type { ApiErrorCode } from "@campus-exchange/contracts";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+
+export type VerifiedContext = { userId: string; campusId: string; requestId: string; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> };
+
+export function requestId(request: Request): string { return request.headers.get("x-request-id") ?? crypto.randomUUID(); }
+
+export function apiError(request: Request, status: number, code: ApiErrorCode, message: string, details?: unknown) {
+  const payload = { error: { code, message, requestId: requestId(request), ...(details === undefined ? {} : { details }) } };
+  return NextResponse.json(payload, { status, headers: { "cache-control": "no-store" } });
+}
+
+export function apiData<T>(request: Request, data: T, status = 200) {
+  return NextResponse.json({ data }, { status, headers: { "cache-control": "private, no-store", "x-request-id": requestId(request) } });
+}
+
+export async function requireVerified(request: Request): Promise<VerifiedContext | NextResponse> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) return apiError(request, 401, "unauthorized", "Sign in with your school email to continue.");
+    const { data, error } = await supabase.from("profiles").select("campus_id,status,verified_until").eq("id", auth.user.id).single();
+    if (error || !data) return apiError(request, 403, "forbidden", "Complete student verification before using Campus Exchange.");
+    if (data.status !== "active") return apiError(request, 403, "forbidden", "This account is not active.");
+    if (!data.verified_until || new Date(data.verified_until) <= new Date()) return apiError(request, 403, "forbidden", "Your student verification has expired.");
+    return { userId: auth.user.id, campusId: data.campus_id, requestId: requestId(request), supabase };
+  } catch (error) {
+    if (error instanceof Error && error.message === "service_unconfigured") return apiError(request, 503, "service_unconfigured", "Connect a Supabase project to enable this feature.");
+    console.error(JSON.stringify({ level: "error", event: "auth_context_failed", requestId: requestId(request) }));
+    return apiError(request, 500, "internal_error", "Unable to verify this request.");
+  }
+}
+
+export async function requireStaff(request: Request, allowed: string[] = ["moderator", "admin"]) {
+  const context = await requireVerified(request);
+  if (context instanceof NextResponse) return context;
+  const { data } = await context.supabase.from("role_assignments").select("role").eq("profile_id", context.userId).in("role", allowed);
+  if (!data?.length) return apiError(request, 403, "forbidden", "Moderator access is required.");
+  return context;
+}
+
+export async function parseJson<T>(request: Request, schema: { safeParse: (value: unknown) => { success: boolean; data?: T; error?: { flatten: () => unknown } } }): Promise<T | NextResponse> {
+  let value: unknown;
+  try { value = await request.json(); } catch { return apiError(request, 400, "bad_request", "Request body must be valid JSON."); }
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) return apiError(request, 400, "bad_request", "Check the submitted fields.", parsed.error?.flatten());
+  return parsed.data as T;
+}
+
+export function encodeCursor(createdAt: string, id: string): string { return Buffer.from(`${createdAt}|${id}`, "utf8").toString("base64url"); }
+export function decodeCursor(cursor?: string): { createdAt: string; id: string } | null {
+  if (!cursor) return null;
+  try { const [createdAt, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|"); return createdAt && id ? { createdAt, id } : null; } catch { return null; }
+}
+
+export function verifyMutationOrigin(request: Request): NextResponse | null {
+  const origin = request.headers.get("origin");
+  const configured = process.env.APP_ORIGIN;
+  if (origin && configured && origin !== configured) return apiError(request, 403, "forbidden", "Request origin was rejected.");
+  if (request.method !== "DELETE" && !request.headers.get("content-type")?.includes("application/json")) return apiError(request, 400, "bad_request", "Content-Type must be application/json.");
+  return null;
+}
+
+export async function enforceRateLimit(request: Request, scope: string, subject: string, limit: number, windowSeconds: number): Promise<NextResponse | null> {
+  try {
+    const input = new TextEncoder().encode(`${scope}:${subject}`);
+    const digest = await crypto.subtle.digest("SHA-256", input);
+    const key = `${scope}:${Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+    const { data, error } = await createSupabaseAdminClient().rpc("consume_rate_limit", { rate_key: key, hit_limit: limit, window_seconds: windowSeconds });
+    if (error || data !== true) return apiError(request, 429, "rate_limited", "Too many requests. Wait briefly and retry.");
+  } catch { /* Missing infrastructure is handled by the route's normal dependency check. */ }
+  return null;
+}

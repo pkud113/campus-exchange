@@ -1,0 +1,18 @@
+import { profileInputSchema } from "@campus-exchange/contracts";
+import { apiData, apiError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const context = await requireVerified(request); if (context instanceof NextResponse) return context;
+  const { data, error } = await context.supabase.from("profiles").select("id,campus_id,handle,display_name,bio,status,verified_at,verified_until,created_at").eq("id", context.userId).single();
+  return error ? apiError(request, 500, "internal_error", "Unable to load your profile.") : apiData(request, data);
+}
+
+export async function PATCH(request: Request) {
+  const originError = verifyMutationOrigin(request); if (originError) return originError;
+  const context = await requireVerified(request); if (context instanceof NextResponse) return context;
+  const input = await parseJson(request, profileInputSchema); if (input instanceof NextResponse) return input;
+  const { data, error } = await context.supabase.from("profiles").update({ handle: input.handle, display_name: input.displayName, bio: input.bio }).eq("id", context.userId).select("id,handle,display_name,bio").single();
+  if (error?.code === "23505") return apiError(request, 409, "conflict", "That handle is already taken.");
+  return error ? apiError(request, 500, "internal_error", "Unable to update your profile.") : apiData(request, data);
+}

@@ -1,0 +1,4 @@
+import { reportInputSchema } from "@campus-exchange/contracts";
+import { apiData, apiError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
+import { NextResponse } from "next/server";
+export async function POST(request:Request){const e=verifyMutationOrigin(request);if(e)return e;const c=await requireVerified(request);if(c instanceof NextResponse)return c;const input=await parseJson(request,reportInputSchema);if(input instanceof NextResponse)return input;const {data,error}=await c.supabase.from("reports").insert({campus_id:c.campusId,reporter_id:c.userId,target_type:input.targetType,target_id:input.targetId,reason:input.reason,details:input.details,idempotency_key:input.idempotencyKey}).select("id,status,created_at").single();return error?apiError(request,400,"bad_request",error.message):apiData(request,data,201);}

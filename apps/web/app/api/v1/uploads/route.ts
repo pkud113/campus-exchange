@@ -1,0 +1,5 @@
+import { z } from "zod";
+import { apiData, apiError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
+import { NextResponse } from "next/server";
+const schema=z.object({listingId:z.string().uuid().optional(),contentType:z.enum(["image/webp","image/png","image/jpeg"]),byteSize:z.number().int().min(1).max(8*1024*1024),altText:z.string().trim().max(300).default("")});
+export async function POST(request:Request){const e=verifyMutationOrigin(request);if(e)return e;const c=await requireVerified(request);if(c instanceof NextResponse)return c;const input=await parseJson(request,schema);if(input instanceof NextResponse)return input;const id=crypto.randomUUID();const objectKey=`${c.campusId}/${c.userId}/${id}.webp`;const {error}=await c.supabase.from("media_uploads").insert({id,campus_id:c.campusId,uploader_id:c.userId,listing_id:input.listingId,object_key:objectKey,content_type:input.contentType,byte_size:input.byteSize,alt_text:input.altText});return error?apiError(request,400,"bad_request","Unable to prepare this upload."):apiData(request,{id,uploadUrl:`/api/v1/uploads/${id}`,expiresInSeconds:600},201);}

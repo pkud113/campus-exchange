@@ -1,0 +1,5 @@
+import { ArrowLeft, Camera, Info, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { ListingForm } from "./listing-form";
+export const metadata={title:"Sell something"};
+export default function Sell(){return <main className="dashboard narrow"><Link className="back-link" href="/exchange"><ArrowLeft size={17}/> Marketplace</Link><div className="form-header"><span className="overline">NEW LISTING</span><h1>Give it a new home.</h1><p>A clear description and fair price help the right student find it faster.</p></div><div className="form-layout"><ListingForm/><aside className="form-aside"><div className="photo-tip"><Camera/><h3>Photos that sell</h3><p>Use natural light, show any wear, and keep personal details out of the frame.</p></div><div><ShieldCheck/><h3>Campus safety</h3><ul><li>Meet in a public campus location</li><li>Never share verification codes</li><li>Inspect before exchanging money</li></ul></div><div className="quiet-tip"><Info/><p>Campus Exchange does not process payments or hold deposits.</p></div></aside></div></main>}

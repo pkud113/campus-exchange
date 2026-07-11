@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Logs
 logs
 *.log
@@ -141,3 +142,19 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+=======
+node_modules/
+.next/
+.open-next/
+.wrangler/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.local
+.dev.vars
+*.tsbuildinfo
+.DS_Store
+supabase/.temp/
+>>>>>>> ff8304d (Initial Campus Exchange implementation)

@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "campus-exchange-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "triggers": { "crons": ["*/1 * * * *"] },
+  "limits": { "cpu_ms": 30000 },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
+}

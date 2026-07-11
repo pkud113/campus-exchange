@@ -1,0 +1,8 @@
+"use client";
+import Link from "next/link";
+import { Heart } from "lucide-react";
+import { useState } from "react";
+
+type ListingCardProps={listing:{id:string;title:string;category:string;condition:string;price_cents:number;currency:string;profiles?:unknown;tone?:string}};
+function sellerName(value:unknown){if(Array.isArray(value))value=value[0];if(value&&typeof value==="object"&&"display_name" in value)return String((value as {display_name?:string}).display_name??"Verified student");return "Verified student"}
+export function ListingCard({listing}:ListingCardProps){const[favorite,setFavorite]=useState(false);async function toggle(e:React.MouseEvent){e.preventDefault();const next=!favorite;setFavorite(next);const init:RequestInit={method:next?"POST":"DELETE"};if(next)init.headers={"content-type":"application/json"};await fetch(`/api/v1/listings/${listing.id}/favorite`,init).catch(()=>setFavorite(!next))}return <Link className="listing-card" href={`/listings/${listing.id}`}><div className={`listing-visual ${listing.tone??"sand"}`}><div className={`product-shape shape-${listing.category}`}><i/><b/><em/></div><button className={favorite?"favorite active":"favorite"} aria-label={favorite?"Remove from favorites":"Add to favorites"} onClick={toggle}><Heart size={19} fill={favorite?"currentColor":"none"}/></button><span className="condition-pill">{listing.condition.replace("_"," ")}</span></div><div className="listing-details"><div><h3>{listing.title}</h3><strong>{new Intl.NumberFormat("en-US",{style:"currency",currency:listing.currency,maximumFractionDigits:0}).format(listing.price_cents/100)}</strong></div><p>{sellerName(listing.profiles)} · On campus</p></div></Link>}
