@@ -70,7 +70,7 @@ jobs:
           fi
 
       - name: Deploy web application
-        run: pnpm --filter @campus-exchange/web deploy
+        run: pnpm --filter @campus-exchange/web run deploy
 
       - name: Configure web runtime secrets
         shell: bash
@@ -83,7 +83,7 @@ jobs:
           printf '%s' "$APP_ORIGIN" | pnpm --dir apps/worker exec wrangler secret put APP_ORIGIN --name campus-exchange-web
 
       - name: Deploy background worker
-        run: pnpm --filter @campus-exchange/worker deploy
+        run: pnpm --filter @campus-exchange/worker run deploy
 
       - name: Configure worker runtime secrets
         shell: bash
