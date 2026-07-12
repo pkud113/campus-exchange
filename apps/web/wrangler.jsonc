@@ -5,10 +5,12 @@
   "compatibility_date": "2026-07-08",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "routes": [{ "pattern": "campus-exchange.net", "custom_domain": true }],
+  "routes": [
+    { "pattern": "campus-exchange.net", "custom_domain": true },
+    { "pattern": "www.campus-exchange.net/*", "zone_name": "campus-exchange.net" }
+  ],
   "r2_buckets": [{ "binding": "MEDIA_BUCKET", "bucket_name": "campus-exchange-media" }],
   "images": { "binding": "IMAGES" },
   "cache": { "enabled": true },
- // "limits": { "cpu_ms": 30000 },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }

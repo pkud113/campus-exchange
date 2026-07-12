@@ -1,6 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
+  const hostname = request.headers.get("host")?.split(":", 1)[0]?.toLowerCase() ?? request.nextUrl.hostname;
+  if (hostname === "www.campus-exchange.net") {
+    const canonical = request.nextUrl.clone();
+    canonical.hostname = "campus-exchange.net";
+    canonical.protocol = "https:";
+    canonical.port = "";
+    return NextResponse.redirect(canonical, 308);
+  }
   const response = NextResponse.next();
   const id = request.headers.get("x-request-id") ?? crypto.randomUUID();
   response.headers.set("x-request-id", id);

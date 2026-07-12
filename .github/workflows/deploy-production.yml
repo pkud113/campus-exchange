@@ -2,6 +2,8 @@ name: Deploy production
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 concurrency:
   group: production
@@ -98,7 +100,9 @@ jobs:
         shell: bash
         run: |
           for attempt in {1..12}; do
-            if curl --fail --silent --show-error https://campus-exchange.net/api/health; then
+            if curl --fail --silent --show-error https://campus-exchange.net/api/health >/dev/null \
+              && curl --fail --silent --show-error https://campus-exchange.net/ >/dev/null \
+              && curl --fail --silent --show-error --location --max-redirs 2 https://www.campus-exchange.net/ >/dev/null; then
               exit 0
             fi
             sleep 10
