@@ -22,7 +22,11 @@ export async function POST(request: Request) {
       if (!verdict.success) return apiError(request, 400, "bad_request", "Human verification failed. Please retry.");
     }
     const { error } = await admin.auth.signInWithOtp({ email: input.email, options: { emailRedirectTo: `${process.env.APP_ORIGIN ?? new URL(request.url).origin}/auth/callback` } });
-    if (error) return apiError(request, 429, "rate_limited", "We could not send a sign-in email yet. Wait briefly and retry.");
+    if (error) {
+      console.error(JSON.stringify({ level: "error", event: "otp_send_failed", requestId: request.headers.get("x-request-id") ?? "unknown", code: error.code ?? "unknown", status: error.status }));
+      if (error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit") return apiError(request, 429, "rate_limited", "Too many sign-in emails were requested. Wait briefly and retry.");
+      return apiError(request, 503, "service_unconfigured", "Email delivery is temporarily unavailable. Please try again shortly.");
+    }
     return apiData(request, { sent: true });
   } catch { return apiError(request, 503, "service_unconfigured", "Student verification is not configured yet."); }
 }

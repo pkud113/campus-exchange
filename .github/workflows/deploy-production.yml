@@ -64,6 +64,35 @@ jobs:
           supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
           supabase db push --include-all
 
+      - name: Configure Supabase Auth email delivery
+        shell: bash
+        run: |
+          payload="$(jq -n \
+            --arg site "$APP_ORIGIN" \
+            --arg smtp_password "$RESEND_API_KEY" \
+            '{
+              external_email_enabled: true,
+              mailer_autoconfirm: false,
+              site_url: $site,
+              uri_allow_list: ($site + "/auth/callback"),
+              smtp_admin_email: "no-reply@campus-exchange.net",
+              smtp_host: "smtp.resend.com",
+              smtp_port: "465",
+              smtp_user: "resend",
+              smtp_pass: $smtp_password,
+              smtp_sender_name: "Campus Exchange"
+            }')"
+          curl --fail-with-body --silent --show-error --retry 3 \
+            --request PATCH "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "$payload" >/dev/null
+          curl --fail --silent --show-error \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            | jq -e --arg site "$APP_ORIGIN" \
+              '.site_url == $site and .smtp_host == "smtp.resend.com" and .smtp_admin_email == "no-reply@campus-exchange.net"' >/dev/null
+
       - name: Ensure private media bucket exists
         shell: bash
         run: |
