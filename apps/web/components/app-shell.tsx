@@ -1,5 +1,15 @@
-import Link from "next/link";
-import { Bell, CalendarDays, Home, MessageCircle, Plus, Search, Settings, ShieldCheck, ShoppingBag } from "lucide-react";
-import { Brand } from "./brand";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { AppNavigation } from "./app-navigation";
 import { ServiceWorker } from "./service-worker";
-export function AppShell({children}:{children:React.ReactNode}){return <div className="app-frame"><ServiceWorker/><aside className="sidebar"><Brand/><nav aria-label="Campus Exchange"><Link className="nav-item active" href="/exchange"><Home/>Home</Link><Link className="nav-item" href="/exchange"><ShoppingBag/>Marketplace</Link><Link className="nav-item" href="/events"><CalendarDays/>Events</Link><Link className="nav-item" href="/messages"><MessageCircle/>Messages<span className="nav-badge">2</span></Link><Link className="nav-item" href="/notifications"><Bell/>Notifications</Link></nav><div className="sidebar-bottom"><Link className="nav-item" href="/admin"><ShieldCheck/>Moderation</Link><Link className="nav-item" href="/profile"><Settings/>Settings</Link><div className="student-chip"><span className="avatar coral">P</span><div><strong>Student preview</strong><small>Verified member</small></div></div></div></aside><div className="app-main"><header className="mobile-header"><Brand compact/><div><button aria-label="Search"><Search/></button><Link href="/notifications" aria-label="Notifications"><Bell/></Link></div></header>{children}<nav className="bottom-nav" aria-label="Mobile navigation"><Link href="/exchange"><Home/><span>Home</span></Link><Link href="/exchange"><ShoppingBag/><span>Market</span></Link><Link className="create-tab" href="/sell"><Plus/><span>Sell</span></Link><Link href="/events"><CalendarDays/><span>Events</span></Link><Link href="/messages"><MessageCircle/><span>Chat</span></Link></nav></div></div>}
+
+export async function AppShell({children}:{children:React.ReactNode}){
+  const db=await createSupabaseServerClient();const{data:{user}}=await db.auth.getUser();
+  const [{data:profile},{data:roles},{count:notificationCount},{data:inbox}]=await Promise.all([
+    db.from("profiles").select("handle,display_name,avatar_media_id,account_kind").eq("id",user!.id).single(),
+    db.from("role_assignments").select("role").eq("profile_id",user!.id),
+    db.from("notifications").select("id",{count:"exact",head:true}).is("read_at",null),
+    db.rpc("conversation_inbox")
+  ]);
+  const messageCount=(inbox??[]).reduce((sum:number,row:{unread_count?:number|string})=>sum+Number(row.unread_count??0),0);
+  return <div className="app-frame"><ServiceWorker/><AppNavigation profile={{id:user!.id,handle:profile?.handle??"member",displayName:profile?.display_name??profile?.handle??"Campus member",avatarId:profile?.avatar_media_id??null}} isStaff={Boolean(roles?.some(({role})=>role==="moderator"||role==="admin"))} notificationCount={notificationCount??0} messageCount={messageCount}/><div className="app-main">{children}</div></div>;
+}

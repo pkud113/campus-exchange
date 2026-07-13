@@ -9,7 +9,9 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "lint": "next lint || tsc --noEmit"
+    "lint": "next lint || tsc --noEmit",
+    "admin:invite": "node scripts/admin-invite.mjs",
+    "auth:v2": "node scripts/auth-v2-cutover.mjs"
   },
   "dependencies": {
     "@campus-exchange/contracts": "workspace:*",

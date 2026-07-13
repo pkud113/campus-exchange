@@ -1,0 +1,2 @@
+import{apiData,apiError,requireVerified,verifyMutationOrigin}from"@/lib/api";import{NextResponse}from"next/server";type Params={params:Promise<{id:string}>};
+export async function POST(request:Request,{params}:Params){const e=verifyMutationOrigin(request);if(e)return e;const c=await requireVerified(request);if(c instanceof NextResponse)return c;const{id}=await params;const{error}=await c.supabase.rpc("mark_conversation_read",{target_conversation:id});return error?apiError(request,403,"forbidden","Unable to mark this conversation read."):apiData(request,{read:true})}

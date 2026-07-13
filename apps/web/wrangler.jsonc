@@ -11,6 +11,7 @@
   ],
   "r2_buckets": [{ "binding": "MEDIA_BUCKET", "bucket_name": "campus-exchange-media" }],
   "images": { "binding": "IMAGES" },
+  "limits": { "cpu_ms": 100 },
   "cache": { "enabled": true },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }

@@ -1,4 +1,1 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ProfileSettings } from "./profile-settings";
-export const metadata={title:"Profile settings"};
-export default async function Profile(){const db=await createSupabaseServerClient();const {data:{user}}=await db.auth.getUser();const {data:profile}=await db.from("profiles").select("handle,display_name,bio,verified_until").eq("id",user!.id).single();const {data:roles}=await db.from("role_assignments").select("role").eq("profile_id",user!.id);return <main className="dashboard narrow"><div className="page-title"><span className="overline">YOUR ACCOUNT</span><h1>Profile & security</h1><p>Control what verified students see and protect staff access.</p></div><ProfileSettings profile={{handle:profile?.handle??"",displayName:profile?.display_name??"",bio:profile?.bio??"",verifiedUntil:profile?.verified_until??""}} isStaff={Boolean(roles?.some(({role})=>role==="moderator"||role==="admin"))}/></main>}
+import {redirect}from"next/navigation";export default function Profile(){redirect("/settings")}

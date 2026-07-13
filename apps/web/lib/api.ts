@@ -21,10 +21,14 @@ export async function requireVerified(request: Request): Promise<VerifiedContext
     const supabase = await createSupabaseServerClient();
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) return apiError(request, 401, "unauthorized", "Sign in with your school email to continue.");
-    const { data, error } = await supabase.from("profiles").select("campus_id,status,verified_until").eq("id", auth.user.id).single();
+    const [{ data, error }, { data: authV2Enforced }] = await Promise.all([
+      supabase.from("profiles").select("campus_id,status,verified_until,account_kind,onboarding_completed_at,password_setup_required").eq("id", auth.user.id).single(),
+      supabase.rpc("auth_v2_enforced")
+    ]);
     if (error || !data) return apiError(request, 403, "forbidden", "Complete student verification before using Campus Exchange.");
+    if (!data.onboarding_completed_at || (authV2Enforced === true && data.password_setup_required)) return apiError(request, 403, "forbidden", "Complete account setup before using Campus Exchange.");
     if (data.status !== "active") return apiError(request, 403, "forbidden", "This account is not active.");
-    if (!data.verified_until || new Date(data.verified_until) <= new Date()) return apiError(request, 403, "forbidden", "Your student verification has expired.");
+    if (data.account_kind !== "staff" && (!data.verified_until || new Date(data.verified_until) <= new Date())) return apiError(request, 403, "forbidden", "Your student verification has expired.");
     return { userId: auth.user.id, campusId: data.campus_id, requestId: requestId(request), supabase };
   } catch (error) {
     if (error instanceof Error && error.message === "service_unconfigured") return apiError(request, 503, "service_unconfigured", "Connect a Supabase project to enable this feature.");
@@ -54,7 +58,11 @@ export async function parseJson<T>(request: Request, schema: { safeParse: (value
 export function encodeCursor(createdAt: string, id: string): string { return Buffer.from(`${createdAt}|${id}`, "utf8").toString("base64url"); }
 export function decodeCursor(cursor?: string): { createdAt: string; id: string } | null {
   if (!cursor) return null;
-  try { const [createdAt, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|"); return createdAt && id ? { createdAt, id } : null; } catch { return null; }
+  try {
+    const [createdAt, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|");
+    if (!createdAt || !id || Number.isNaN(Date.parse(createdAt)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return null;
+    return { createdAt, id };
+  } catch { return null; }
 }
 
 export function verifyMutationOrigin(request: Request): NextResponse | null {

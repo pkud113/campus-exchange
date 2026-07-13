@@ -1,109 +1,23 @@
 "use client";
+import{createSupabaseBrowserClient}from"@/lib/supabase/client";import{Check,LoaderCircle,MessageCircle,Search,UserPlus,X}from"lucide-react";import{useSearchParams}from"next/navigation";import{useCallback,useEffect,useMemo,useState}from"react";
 
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { LoaderCircle, MessageCircle, Search } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+type Conversation={id:string;listing_id:string|null;listing_title:string|null;last_message_at:string;other_profile_id:string;other_handle:string;other_display_name:string|null;other_avatar_id:string|null;latest_body:string|null;latest_created_at:string|null;unread_count:number|string};
+type Message={id:string;sender_id:string;body:string;created_at:string};
+type Profile={id:string;handle:string;display_name:string|null;avatar_media_id:string|null};
+type RequestRow={id:string;requester_id:string;recipient_id:string;status:string;created_at:string;requester:Profile|Profile[];recipient:Profile|Profile[]};
+const one=<T,>(value:T|T[])=>Array.isArray(value)?value[0]:value;
 
-type Participant = {
-  profile_id: string;
-  profiles?: { handle?: string; display_name?: string } | Array<{ handle?: string; display_name?: string }>;
-};
-type Conversation = {
-  id: string;
-  listing_id: string | null;
-  last_message_at: string;
-  listings?: { title?: string } | Array<{ title?: string }>;
-  conversation_participants?: Participant[];
-};
-type Message = { id: string; sender_id: string; body: string; created_at: string };
-
-export function MessagesClient() {
-  const requestedConversation = useSearchParams().get("conversation");
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selected, setSelected] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [currentUser, setCurrentUser] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [body, setBody] = useState("");
-
-  useEffect(() => {
-    const client = createSupabaseBrowserClient();
-    client.auth.getUser().then(({ data }) => setCurrentUser(data.user?.id ?? ""));
-    fetch("/api/v1/conversations")
-      .then((response) => response.json())
-      .then((result) => {
-        const loaded = (result.data ?? []) as Conversation[];
-        setConversations(loaded);
-        setSelected(loaded.some((item) => item.id === requestedConversation) ? requestedConversation! : loaded[0]?.id ?? "");
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Unable to load conversations.");
-        setLoading(false);
-      });
-  }, [requestedConversation]);
-
-  useEffect(() => {
-    if (!selected) return;
-    let active = true;
-    async function load() {
-      const response = await fetch(`/api/v1/conversations/${selected}/messages?limit=50`);
-      const result = await response.json();
-      if (active) setMessages((result.data ?? []).reverse());
-    }
-    void load();
-    const supabase = createSupabaseBrowserClient();
-    const channel = supabase
-      .channel(`conversation:${selected}`, { config: { private: true } })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${selected}` }, () => void load())
-      .subscribe();
-    return () => {
-      active = false;
-      void supabase.removeChannel(channel);
-    };
-  }, [selected]);
-
-  const activeConversation = useMemo(() => conversations.find((conversation) => conversation.id === selected), [conversations, selected]);
-  function relationName(value: Conversation["listings"]) {
-    const row = Array.isArray(value) ? value[0] : value;
-    return row?.title ?? "Marketplace conversation";
-  }
-  function participantName(conversation: Conversation) {
-    const other = conversation.conversation_participants?.find((participant) => participant.profile_id !== currentUser);
-    const profile = Array.isArray(other?.profiles) ? other.profiles[0] : other?.profiles;
-    return profile?.display_name ?? profile?.handle ?? "Verified student";
-  }
-  async function send(event: React.FormEvent) {
-    event.preventDefault();
-    if (!body.trim() || !selected) return;
-    const draft = body;
-    setBody("");
-    setError("");
-    const response = await fetch(`/api/v1/conversations/${selected}/messages`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ body: draft, idempotencyKey: crypto.randomUUID() })
-    });
-    const result = await response.json();
-    if (response.ok) setMessages((existing) => existing.some((message) => message.id === result.data.id) ? existing : [...existing, result.data]);
-    else {
-      setBody(draft);
-      setError(result.error?.message ?? "Unable to send message.");
-    }
-  }
-
-  if (loading) return <main className="center-state"><LoaderCircle className="spin" /> Loading conversations…</main>;
-  return <main className="messages-page">
-    <section className="conversation-list">
-      <div className="messages-head"><span className="overline">PRIVATE &amp; VERIFIED</span><h1>Messages</h1><label><Search /><input placeholder="Search conversations" aria-label="Search conversations" /></label></div>
-      {!conversations.length && <div className="empty-state"><MessageCircle /><h2>No conversations yet</h2><p>Open a listing and message its seller to start one.</p></div>}
-      {conversations.map((conversation) => <button key={conversation.id} className={`conversation-row ${conversation.id === selected ? "selected" : ""}`} onClick={() => setSelected(conversation.id)}><span className="avatar coral">{participantName(conversation)[0]?.toUpperCase()}</span><div><span><strong>{participantName(conversation)}</strong><small>{new Date(conversation.last_message_at).toLocaleDateString()}</small></span><em>{relationName(conversation.listings)}</em></div></button>)}
-    </section>
-    <section className="thread">
-      {activeConversation ? <><header><span className="avatar coral">{participantName(activeConversation)[0]?.toUpperCase()}</span><div><strong>{participantName(activeConversation)}</strong><small>{relationName(activeConversation.listings)} · Verified student</small></div></header><div className="trade-banner"><MessageCircle /><div><strong>Keep the conversation here</strong><span>Never share verification codes or send a deposit to hold an item.</span></div></div><div className="message-stream">{messages.map((message) => <div key={message.id} className={`bubble ${message.sender_id === currentUser ? "mine" : "theirs"}`}>{message.body}<small>{new Date(message.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small></div>)}</div><form className="message-composer" onSubmit={send}><input aria-label="Write a message" placeholder="Write a message…" value={body} onChange={(event) => setBody(event.target.value)} maxLength={4000} /><button className="button button-primary" disabled={!body.trim()}>Send</button></form></> : <div className="empty-state"><MessageCircle /><h2>Select a conversation</h2></div>}
-      {error && <p className="form-error message-error" role="alert">{error}</p>}
-    </section>
-  </main>;
+export function MessagesClient(){
+  const params=useSearchParams();const[conversations,setConversations]=useState<Conversation[]>([]);const[requests,setRequests]=useState<RequestRow[]>([]);const[selected,setSelected]=useState("");const[messages,setMessages]=useState<Message[]>([]);const[currentUser,setCurrentUser]=useState("");const[body,setBody]=useState("");const[loading,setLoading]=useState(true);const[error,setError]=useState("");const[memberQuery,setMemberQuery]=useState(params.get("new")??"");const[members,setMembers]=useState<Profile[]>([]);const[searching,setSearching]=useState(false);
+  const loadInbox=useCallback(async()=>{const[conversationResponse,requestResponse]=await Promise.all([fetch("/api/v1/conversations"),fetch("/api/v1/conversation-requests")]);const[conversationBody,requestBody]=await Promise.all([conversationResponse.json(),requestResponse.json()]);if(conversationResponse.ok){setConversations(conversationBody.data);setSelected(value=>value||conversationBody.data[0]?.id||"")}if(requestResponse.ok)setRequests(requestBody.data);setLoading(false)},[]);
+  useEffect(()=>{createSupabaseBrowserClient().auth.getUser().then(({data})=>setCurrentUser(data.user?.id??""));void loadInbox()},[loadInbox]);
+  useEffect(()=>{if(params.get("new")){void searchMembers(params.get("new")??"")}},[]);
+  useEffect(()=>{if(!selected){setMessages([]);return}let live=true;async function load(){const response=await fetch(`/api/v1/conversations/${selected}/messages`);const result=await response.json();if(response.ok&&live){setMessages([...(result.data??[])].reverse());await fetch(`/api/v1/conversations/${selected}/read`,{method:"POST",headers:{"content-type":"application/json"},body:"{}"});setConversations(items=>items.map(item=>item.id===selected?{...item,unread_count:0}:item))}else if(!response.ok)setError(result.error?.message??"Unable to load messages.")}void load();const channel=createSupabaseBrowserClient().channel(`conversation:${selected}`,{config:{private:true}}).on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${selected}`},()=>void load()).subscribe();return()=>{live=false;void createSupabaseBrowserClient().removeChannel(channel)}},[selected]);
+  const active=useMemo(()=>conversations.find(item=>item.id===selected),[conversations,selected]);
+  async function searchMembers(query=memberQuery){if(query.trim().length<2)return;setSearching(true);const response=await fetch(`/api/v1/profiles?q=${encodeURIComponent(query.trim())}`);const result=await response.json();if(response.ok)setMembers(result.data);else setError(result.error?.message??"Unable to search members.");setSearching(false)}
+  async function requestConversation(profileId:string){setError("");const response=await fetch("/api/v1/conversation-requests",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({profileId})});const result=await response.json();if(response.ok){setMembers(items=>items.filter(item=>item.id!==profileId));await loadInbox()}else setError(result.error?.message??"Unable to send request.")}
+  async function respond(id:string,responseValue:"accepted"|"declined"){const response=await fetch(`/api/v1/conversation-requests/${id}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({response:responseValue})});const result=await response.json();if(response.ok)await loadInbox();else setError(result.error?.message??"Unable to update request.")}
+  async function send(event:React.FormEvent){event.preventDefault();if(!selected||!body.trim())return;const text=body.trim();setBody("");const response=await fetch(`/api/v1/conversations/${selected}/messages`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({body:text,idempotencyKey:crypto.randomUUID()})});const result=await response.json();if(response.ok)setMessages(items=>items.some(item=>item.id===result.data.id)?items:[...items,result.data]);else{setBody(text);setError(result.error?.message??"Unable to send message.")}}
+  if(loading)return <main className="center-state"><LoaderCircle className="spin"/>Loading conversations…</main>;
+  return <main className="messages-page"><section className="conversation-list"><div className="messages-head"><span className="overline">PRIVATE & VERIFIED</span><h1>Messages</h1><form onSubmit={event=>{event.preventDefault();void searchMembers()}}><label><Search/><input placeholder="Find campus members" aria-label="Find campus members" value={memberQuery} onChange={event=>setMemberQuery(event.target.value)}/></label></form></div>{members.length>0&&<div className="member-results">{members.map(member=><article key={member.id}>{member.avatar_media_id?<img className="avatar" src={`/api/v1/media/${member.avatar_media_id}?variant=thumb`} alt=""/>:<span className="avatar mint">{(member.display_name??member.handle)[0]?.toUpperCase()}</span>}<div><strong>{member.display_name??member.handle}</strong><span>@{member.handle}</span></div><button className="button button-small button-primary" onClick={()=>requestConversation(member.id)}><UserPlus/>Request</button></article>)}</div>}{searching&&<p className="form-notice">Searching…</p>}{requests.length>0&&<div className="request-list"><h2>Conversation requests</h2>{requests.map(request=>{const incoming=request.recipient_id===currentUser;const person=one(incoming?request.requester:request.recipient)??{id:"",handle:"member",display_name:"Campus member",avatar_media_id:null};return <article key={request.id}><span className="avatar lilac">{(person.display_name??person.handle)[0]?.toUpperCase()}</span><div><strong>{person.display_name??person.handle}</strong><span>{incoming?"wants to message you":"Request pending"}</span></div>{incoming&&<><button aria-label="Accept" onClick={()=>respond(request.id,"accepted")}><Check/></button><button aria-label="Decline" onClick={()=>respond(request.id,"declined")}><X/></button></>}</article>})}</div>}{!conversations.length&&<div className="empty-state"><MessageCircle/><h2>No conversations yet</h2><p>Search for a campus member or open a listing to begin.</p></div>}{conversations.map(conversation=><button key={conversation.id} className={`conversation-row ${conversation.id===selected?"selected":""}`} onClick={()=>setSelected(conversation.id)}>{conversation.other_avatar_id?<img className="avatar" src={`/api/v1/media/${conversation.other_avatar_id}?variant=thumb`} alt=""/>:<span className="avatar coral">{(conversation.other_display_name??conversation.other_handle)[0]?.toUpperCase()}</span>}<div><span><strong>{conversation.other_display_name??conversation.other_handle}</strong><small>{new Date(conversation.latest_created_at??conversation.last_message_at).toLocaleDateString()}</small></span><em>{conversation.latest_body??conversation.listing_title??"Conversation ready"}</em></div>{Number(conversation.unread_count)>0&&<b className="nav-badge">{conversation.unread_count}</b>}</button>)}</section><section className="chat-panel">{active?<><header>{active.other_avatar_id?<img className="avatar" src={`/api/v1/media/${active.other_avatar_id}?variant=thumb`} alt=""/>:<span className="avatar coral">{(active.other_display_name??active.other_handle)[0]?.toUpperCase()}</span>}<div><strong>{active.other_display_name??active.other_handle}</strong><small>{active.listing_title??`@${active.other_handle}`}</small></div></header><div className="trade-banner"><MessageCircle/><div><strong>Keep the conversation here</strong><span>Never share verification codes or send a deposit to hold an item.</span></div></div><div className="message-stream">{messages.length?messages.map(message=><div key={message.id} className={`bubble ${message.sender_id===currentUser?"mine":"theirs"}`}>{message.body}<small>{new Date(message.created_at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</small></div>):<div className="empty-state compact"><p>No messages yet. Say hello when you are ready.</p></div>}</div><form className="message-composer" onSubmit={send}><input aria-label="Write a message" placeholder="Write a message…" value={body} onChange={event=>setBody(event.target.value)} maxLength={4000}/><button className="button button-primary" disabled={!body.trim()}>Send</button></form></>:<div className="empty-state"><MessageCircle/><h2>Select a conversation</h2></div>}{error&&<p className="form-error message-error" role="alert">{error}</p>}</section></main>;
 }

@@ -1,0 +1,2 @@
+import{apiData,apiError,requireVerified}from"@/lib/api";import{NextResponse}from"next/server";
+export async function GET(request:Request){const c=await requireVerified(request);if(c instanceof NextResponse)return c;const{data,error}=await c.supabase.from("listings").select("*,media_uploads(id,alt_text,status)").eq("seller_id",c.userId).is("deleted_at",null).order("created_at",{ascending:false});return error?apiError(request,500,"internal_error","Unable to load your listings."):apiData(request,data??[])}
