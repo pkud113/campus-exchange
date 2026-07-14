@@ -1,6 +1,95 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { apiError, requireVerified } from "@/lib/api";
 import { NextResponse } from "next/server";
-type MediaEnv={MEDIA_BUCKET:{get:(key:string)=>Promise<{body:ReadableStream<Uint8Array>}|null>};IMAGES:{input:(stream:ReadableStream<Uint8Array>)=>{transform:(options:unknown)=>{output:(options:unknown)=>Promise<{response:()=>Response}>}}}};
-type Params={params:Promise<{id:string}>};
-export async function GET(request:Request,{params}:Params){const c=await requireVerified(request);if(c instanceof NextResponse)return c;const {id}=await params;const {data}=await c.supabase.from("media_uploads").select("object_key,status,campus_id").eq("id",id).single();if(!data||data.status!=="ready"||data.campus_id!==c.campusId)return apiError(request,404,"not_found","Media not found.");try{const {env}=getCloudflareContext() as unknown as {env:MediaEnv};const object=await env.MEDIA_BUCKET.get(data.object_key);if(!object)return apiError(request,404,"not_found","Media not found.");const variant=new URL(request.url).searchParams.get("variant")??"card";const width=variant==="thumb"?320:variant==="full"?1600:720;const output=await env.IMAGES.input(object.body).transform({width,height:width,fit:"scale-down"}).output({format:"image/webp",quality:82,anim:false});const response=output.response();return new Response(response.body,{status:response.status,headers:{"content-type":"image/webp","cache-control":"private, no-store","content-security-policy":"default-src 'none'","x-content-type-options":"nosniff"}});}catch{return apiError(request,503,"internal_error","Media is temporarily unavailable.");}}
+import {
+  transformImageForDelivery,
+  type CloudflareImagesBinding,
+} from "@/lib/image-processing";
+
+type R2ObjectBody = {
+  arrayBuffer: () => Promise<ArrayBuffer>;
+  httpMetadata?: { contentType?: string };
+};
+type MediaEnv = {
+  MEDIA_BUCKET: { get: (key: string) => Promise<R2ObjectBody | null> };
+  IMAGES: CloudflareImagesBinding;
+};
+type Params = { params: Promise<{ id: string }> };
+
+const variantWidths = { thumb: 320, card: 720, full: 1600 } as const;
+
+export async function GET(request: Request, { params }: Params) {
+  const context = await requireVerified(request);
+  if (context instanceof NextResponse) return context;
+  const { id } = await params;
+  const { data } = await context.supabase
+    .from("media_uploads")
+    .select("object_key,status,campus_id,content_type")
+    .eq("id", id)
+    .single();
+  if (!data || data.status !== "ready" || data.campus_id !== context.campusId) {
+    return apiError(request, 404, "not_found", "Media not found.");
+  }
+
+  try {
+    const { env } = getCloudflareContext() as unknown as { env: MediaEnv };
+    const object = await env.MEDIA_BUCKET.get(data.object_key);
+    if (!object) {
+      return apiError(request, 404, "not_found", "Media not found.");
+    }
+    const requestedVariant = new URL(request.url).searchParams.get("variant");
+    const variant =
+      requestedVariant && requestedVariant in variantWidths
+        ? (requestedVariant as keyof typeof variantWidths)
+        : "card";
+    const original = await object.arrayBuffer();
+    const result = await transformImageForDelivery({
+      bytes: original,
+      width: variantWidths[variant],
+      images: env.IMAGES,
+    });
+    if (!result.optimized) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          event: "image_delivery_fallback",
+          requestId: context.requestId,
+          mediaId: id,
+          variant,
+          message: result.error,
+        }),
+      );
+    }
+    const contentType = result.optimized
+      ? "image/webp"
+      : object.httpMetadata?.contentType || data.content_type;
+    return new Response(result.bytes, {
+      status: 200,
+      headers: {
+        "content-type": contentType,
+        "content-length": String(result.bytes.byteLength),
+        "cache-control": "private, no-store",
+        "content-disposition": "inline",
+        "content-security-policy": "default-src 'none'",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "image_delivery_failed",
+        requestId: context.requestId,
+        mediaId: id,
+        stage: "r2-get",
+        message: error instanceof Error ? error.message : "unknown",
+      }),
+    );
+    return apiError(
+      request,
+      503,
+      "internal_error",
+      "Media is temporarily unavailable.",
+    );
+  }
+}

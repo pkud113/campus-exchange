@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { UserAvatar } from "@/components/user-avatar";
 
 type Conversation = {
   id: string;
@@ -242,17 +243,11 @@ export function MessagesClient() {
           <div className="member-results">
             {members.map((member) => (
               <article key={member.id}>
-                {member.avatar_media_id ? (
-                  <img
-                    className="avatar"
-                    src={`/api/v1/media/${member.avatar_media_id}?variant=thumb`}
-                    alt=""
-                  />
-                ) : (
-                  <span className="avatar mint">
-                    {(member.display_name ?? member.handle)[0]?.toUpperCase()}
-                  </span>
-                )}
+                <UserAvatar
+                  name={member.display_name ?? member.handle}
+                  mediaId={member.avatar_media_id}
+                  tone="mint"
+                />
                 <div>
                   <strong>{member.display_name ?? member.handle}</strong>
                   <span>@{member.handle}</span>
@@ -284,9 +279,11 @@ export function MessagesClient() {
               };
               return (
                 <article key={request.id}>
-                  <span className="avatar lilac">
-                    {(person.display_name ?? person.handle)[0]?.toUpperCase()}
-                  </span>
+                  <UserAvatar
+                    name={person.display_name ?? person.handle}
+                    mediaId={person.avatar_media_id}
+                    tone="lilac"
+                  />
                   <div>
                     <strong>{person.display_name ?? person.handle}</strong>
                     <span>
@@ -327,18 +324,10 @@ export function MessagesClient() {
             className={`conversation-row ${conversation.id === selected ? "selected" : ""}`}
             onClick={() => setSelected(conversation.id)}
           >
-            {conversation.other_avatar_id ? (
-              <img
-                className="avatar"
-                src={`/api/v1/media/${conversation.other_avatar_id}?variant=thumb`}
-                alt=""
-              />
-            ) : (
-              <span className="avatar coral">
-                {(conversation.other_display_name ??
-                  conversation.other_handle)[0]?.toUpperCase()}
-              </span>
-            )}
+            <UserAvatar
+              name={conversation.other_display_name ?? conversation.other_handle}
+              mediaId={conversation.other_avatar_id}
+            />
             <div>
               <span>
                 <strong>
@@ -367,18 +356,10 @@ export function MessagesClient() {
         {active ? (
           <>
             <header>
-              {active.other_avatar_id ? (
-                <img
-                  className="avatar"
-                  src={`/api/v1/media/${active.other_avatar_id}?variant=thumb`}
-                  alt=""
-                />
-              ) : (
-                <span className="avatar coral">
-                  {(active.other_display_name ??
-                    active.other_handle)[0]?.toUpperCase()}
-                </span>
-              )}
+              <UserAvatar
+                name={active.other_display_name ?? active.other_handle}
+                mediaId={active.other_avatar_id}
+              />
               <div>
                 <strong>
                   {active.other_display_name ?? active.other_handle}

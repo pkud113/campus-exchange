@@ -15,7 +15,7 @@ export default async function EditListing({
   const { data } = await db
     .from("listings")
     .select(
-      "id,seller_id,title,description,category,condition,price_cents,currency,deleted_at",
+      "id,seller_id,title,description,category,condition,price_cents,currency,deleted_at,media_uploads(id,alt_text,status)",
     )
     .eq("id", id)
     .single();
@@ -26,7 +26,12 @@ export default async function EditListing({
         <span className="overline">MY LISTINGS</span>
         <h1>Edit listing</h1>
       </div>
-      <ListingEditForm listing={data} />
+      <ListingEditForm
+        listing={data}
+        existingPhotos={(data.media_uploads ?? [])
+          .filter((photo) => photo.status === "ready")
+          .map((photo) => ({ id: photo.id, altText: photo.alt_text || data.title }))}
+      />
     </main>
   );
 }
