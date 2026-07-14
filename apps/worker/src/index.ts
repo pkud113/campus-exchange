@@ -19,13 +19,15 @@ type OutboxEvent = {
   attempt_count: number;
 };
 
-async function deterministicNotificationId(eventId: string, recipientId: string): Promise<string> {
+export async function deterministicNotificationId(eventId: string, recipientId: string): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${eventId}:${recipientId}`)));
   digest[6] = (digest[6]! & 0x0f) | 0x50;
   digest[8] = (digest[8]! & 0x3f) | 0x80;
   const hex = Array.from(digest.slice(0, 16), (byte) => byte.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
+
+export function retryDelaySeconds(attemptCount:number){return Math.min(3600,2**attemptCount*15)}
 
 async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env: Env) {
   const conversationId = event.payload.conversationId;
@@ -75,7 +77,7 @@ async function runBatch(env: Env): Promise<number> {
       processed++;
     } catch (error) {
       const dead = event.attempt_count >= 8;
-      const delaySeconds = Math.min(3600, 2 ** event.attempt_count * 15);
+      const delaySeconds = retryDelaySeconds(event.attempt_count);
       await db.from("outbox_events").update({
         status: dead ? "dead_letter" : "pending",
         available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),

@@ -1,0 +1,2 @@
+import{describe,expect,it}from"vitest";import{deterministicNotificationId,retryDelaySeconds}from"./index";
+describe("worker delivery helpers",()=>{it("creates stable version-5 UUIDs",async()=>{const first=await deterministicNotificationId("event","recipient");expect(await deterministicNotificationId("event","recipient")).toBe(first);expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)});it("caps exponential retry delays at one hour",()=>{expect(retryDelaySeconds(0)).toBe(15);expect(retryDelaySeconds(20)).toBe(3600)})});

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       await supabase.auth.signOut({ scope: "local" });
       return apiError(request, 403, "forbidden", "Complete account setup before signing in with a password.");
     }
-    return apiData(request, { authenticated: true, next: "/home" });
+    return apiData(request, { authenticated: true, next: input.next ?? "/home" });
   } catch {
     return apiError(request, 503, "service_unconfigured", "Sign-in is temporarily unavailable.");
   }

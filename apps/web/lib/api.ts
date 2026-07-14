@@ -80,6 +80,9 @@ export async function enforceRateLimit(request: Request, scope: string, subject:
     const key = `${scope}:${Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
     const { data, error } = await createSupabaseAdminClient().rpc("consume_rate_limit", { rate_key: key, hit_limit: limit, window_seconds: windowSeconds });
     if (error || data !== true) return apiError(request, 429, "rate_limited", "Too many requests. Wait briefly and retry.");
-  } catch { /* Missing infrastructure is handled by the route's normal dependency check. */ }
+  } catch {
+    console.error(JSON.stringify({ level: "error", event: "rate_limit_unavailable", requestId: requestId(request), scope }));
+    return apiError(request, 503, "service_unconfigured", "Request protection is temporarily unavailable. Please retry shortly.");
+  }
   return null;
 }

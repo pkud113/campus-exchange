@@ -1,0 +1,3 @@
+import{describe,expect,it}from"vitest";import{detectedImageType}from"./images";
+const buffer=(values:number[])=>new Uint8Array(values).buffer;
+describe("detectedImageType",()=>{it("recognizes JPEG signatures",()=>expect(detectedImageType(buffer([0xff,0xd8,0xff,0xe0]))).toBe("image/jpeg"));it("recognizes PNG signatures",()=>expect(detectedImageType(buffer([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))).toBe("image/png"));it("recognizes WebP signatures",()=>expect(detectedImageType(buffer([82,73,70,70,0,0,0,0,87,69,66,80]))).toBe("image/webp"));it("rejects misleading content",()=>expect(detectedImageType(buffer([0,1,2,3,4,5,6,7,8,9,10,11]))).toBeNull())});

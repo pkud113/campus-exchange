@@ -23,6 +23,7 @@ test-results/
 
 # Supabase CLI state
 supabase/.temp/
+supabase/.branches/
 
 # Logs and operating-system files
 logs/

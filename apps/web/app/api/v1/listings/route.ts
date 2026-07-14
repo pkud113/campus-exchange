@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const context = await requireVerified(request); if (context instanceof NextResponse) return context;
   const limited=await enforceRateLimit(request,"listing-create",context.userId,10,3600);if(limited)return limited;
   const input = await parseJson(request, listingInputSchema); if (input instanceof NextResponse) return input;
-  const { data, error } = await context.supabase.from("listings").insert({ campus_id: context.campusId, seller_id: context.userId, title: input.title, description: input.description, category: input.category, condition: input.condition, price_cents: input.priceCents, currency: input.currency, status: "active", idempotency_key: input.idempotencyKey }).select().single();
+  const { data, error } = await context.supabase.from("listings").insert({ campus_id: context.campusId, seller_id: context.userId, title: input.title, description: input.description, category: input.category, condition: input.condition, price_cents: input.priceCents, currency: input.currency, status: "draft", idempotency_key: input.idempotencyKey }).select().single();
   if (error?.code === "23505") { const existing = await context.supabase.from("listings").select().eq("seller_id", context.userId).eq("idempotency_key", input.idempotencyKey).single(); return apiData(request, existing.data); }
   return error ? apiError(request, 500, "internal_error", "Unable to publish this listing.") : apiData(request, data, 201);
 }

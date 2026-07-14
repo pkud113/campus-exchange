@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ServiceWorker } from "@/components/service-worker";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_ORIGIN ?? "http://localhost:3000"),
@@ -16,5 +17,5 @@ export const viewport: Viewport = { themeColor: [{media:"(prefers-color-scheme: 
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const themeScript=`(()=>{try{const value=localStorage.getItem('campus-theme')||'system';const resolved=value==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):value;document.documentElement.dataset.theme=resolved;document.documentElement.style.colorScheme=resolved}catch{}})()`;
-  return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{__html:themeScript}}/></head><body>{children}</body></html>;
+  return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{__html:themeScript}}/></head><body><ServiceWorker/>{children}</body></html>;
 }

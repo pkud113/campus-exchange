@@ -41,7 +41,7 @@ jobs:
           cache: pnpm
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.101.0
 
       - name: Validate deployment credentials
         shell: bash
