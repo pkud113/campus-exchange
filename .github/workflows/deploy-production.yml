@@ -54,6 +54,19 @@ jobs:
             fi
           done
 
+      - name: Validate Turnstile secret
+        shell: bash
+        run: |
+          result="$(curl --fail-with-body --silent --show-error --retry 3 \
+            --request POST 'https://challenges.cloudflare.com/turnstile/v0/siteverify' \
+            --data-urlencode "secret=$TURNSTILE_SECRET_KEY" \
+            --data-urlencode 'response=')"
+          echo "$result" | jq -e '
+            (.["error-codes"] // []) as $codes
+            | (($codes | index("invalid-input-secret")) == null)
+              and (($codes | index("missing-input-response")) != null)
+          ' >/dev/null
+
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
