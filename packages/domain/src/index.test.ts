@@ -1,10 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { assertListingTransition, canCreateDirectConversationRequest, canManageOwnedContent, canRespondToConversationRequest, canTransitionListing, isVerificationCurrent, normalizeSchoolDomain, purgeAt, validatePassword } from "./index";
+import { assertListingTransition, canCommentInDiscussion, canCreateDirectConversationRequest, canLeaveDiscussion, canManageDiscussionModerators, canManageOwnedContent, canModerateDiscussion, canPostInDiscussion, canRespondToConversationRequest, canTransferDiscussionOwnership, canTransitionListing, discussionCommentDepth, isValidDiscussionSlug, isVerificationCurrent, nextVoteValue, normalizeSchoolDomain, purgeAt, validateDiscussionPost, validatePassword } from "./index";
 
 describe("listing lifecycle", () => {
   it("allows the intended forward path", () => expect(canTransitionListing("active", "reserved")).toBe(true));
   it("keeps terminal states terminal", () => expect(canTransitionListing("sold", "active")).toBe(false));
   it("requires a buyer for reservation", () => expect(() => assertListingTransition("active", "reserved")).toThrow(/buyer/i));
+});
+
+describe("discussion rules", () => {
+  it("validates immutable community slug syntax", () => {
+    expect(isValidDiscussionSlug("campus_life")).toBe(true);
+    expect(isValidDiscussionSlug("No-Dashes")).toBe(false);
+    expect(isValidDiscussionSlug("ab")).toBe(false);
+  });
+  it("applies posting permissions and archive state", () => {
+    expect(canPostInDiscussion({ role: "member", state: "active", permission: "members", communityStatus: "active" })).toBe(true);
+    expect(canPostInDiscussion({ role: "member", state: "active", permission: "moderators", communityStatus: "active" })).toBe(false);
+    expect(canPostInDiscussion({ role: "moderator", state: "active", permission: "moderators", communityStatus: "active" })).toBe(true);
+    expect(canPostInDiscussion({ role: "owner", state: "active", permission: "members", communityStatus: "archived" })).toBe(false);
+  });
+  it("keeps moderation and ownership least-privileged", () => {
+    expect(canModerateDiscussion("moderator", "active")).toBe(true);
+    expect(canModerateDiscussion("member", "active")).toBe(false);
+    expect(canManageDiscussionModerators("owner")).toBe(true);
+    expect(canManageDiscussionModerators("moderator")).toBe(false);
+    expect(canLeaveDiscussion("owner", "active")).toBe(false);
+    expect(canLeaveDiscussion("member", "active")).toBe(true);
+    expect(canTransferDiscussionOwnership({ actorRole: "owner", targetRole: "member", targetState: "active", sameUser: false })).toBe(true);
+    expect(canTransferDiscussionOwnership({ actorRole: "owner", targetRole: "member", targetState: "banned", sameUser: false })).toBe(false);
+  });
+  it("enforces the eight-level comment limit", () => {
+    expect(discussionCommentDepth(null)).toBe(0);
+    expect(discussionCommentDepth(7)).toBe(8);
+    expect(() => discussionCommentDepth(8)).toThrow(/eight levels/i);
+  });
+  it("rejects comments on inactive, locked, removed, or deleted targets", () => {
+    const open = { state: "active", communityStatus: "active", commentsEnabled: true, postLocked: false, postRemoved: false, postDeleted: false } as const;
+    expect(canCommentInDiscussion(open)).toBe(true);
+    expect(canCommentInDiscussion({ ...open, state: "banned" })).toBe(false);
+    expect(canCommentInDiscussion({ ...open, communityStatus: "archived" })).toBe(false);
+    expect(canCommentInDiscussion({ ...open, commentsEnabled: false })).toBe(false);
+    expect(canCommentInDiscussion({ ...open, postLocked: true })).toBe(false);
+    expect(canCommentInDiscussion({ ...open, postRemoved: true })).toBe(false);
+    expect(canCommentInDiscussion({ ...open, postDeleted: true })).toBe(false);
+  });
+  it("toggles and switches votes", () => {
+    expect(nextVoteValue(0, 1)).toBe(1);
+    expect(nextVoteValue(1, 1)).toBe(0);
+    expect(nextVoteValue(-1, 1)).toBe(1);
+  });
+  it("validates each discussion post type", () => {
+    expect(() => validateDiscussionPost({ type: "text", body: "" })).toThrow(/body/i);
+    expect(() => validateDiscussionPost({ type: "link", linkUrl: "http://example.com" })).toThrow(/HTTPS/i);
+    expect(() => validateDiscussionPost({ type: "image" })).toThrow(/media/i);
+    expect(() => validateDiscussionPost({ type: "text", body: "Hello campus" })).not.toThrow();
+  });
 });
 
 describe("student verification", () => {

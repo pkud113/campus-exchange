@@ -1,2 +1,29 @@
-import{describe,expect,it}from"vitest";import{deterministicNotificationId,retryDelaySeconds}from"./index";
-describe("worker delivery helpers",()=>{it("creates stable version-5 UUIDs",async()=>{const first=await deterministicNotificationId("event","recipient");expect(await deterministicNotificationId("event","recipient")).toBe(first);expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)});it("caps exponential retry delays at one hour",()=>{expect(retryDelaySeconds(0)).toBe(15);expect(retryDelaySeconds(20)).toBe(3600)})});
+import { describe, expect, it } from "vitest";
+import { deterministicNotificationId, discussionNotificationCopy, retryDelaySeconds, shouldSuppressDiscussionNotification } from "./index";
+
+describe("worker delivery helpers", () => {
+  it("creates stable version-5 UUIDs", async () => {
+    const first = await deterministicNotificationId("event", "recipient");
+    expect(await deterministicNotificationId("event", "recipient")).toBe(first);
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+  it("caps exponential retry delays at one hour", () => {
+    expect(retryDelaySeconds(0)).toBe(15);
+    expect(retryDelaySeconds(20)).toBe(3600);
+  });
+  it.each([
+    "discussion.post_replied", "discussion.comment_replied", "discussion.add_moderator",
+    "discussion.remove_moderator", "discussion.ban_member", "discussion.unban_member",
+    "discussion.remove_post", "discussion.remove_comment", "discussion.remove_community", "discussion.ownership_transferred"
+  ])("creates generic, content-free copy for %s", (eventType) => {
+    const result = discussionNotificationCopy(eventType, "campus_life", "11111111-1111-1111-1111-111111111111");
+    expect(result.title.length).toBeGreaterThan(3);
+    expect(result.body.length).toBeGreaterThan(3);
+    expect(result.href).toBe("/discussions/c/campus_life/posts/11111111-1111-1111-1111-111111111111");
+    expect(JSON.stringify(result)).not.toMatch(/email|signed url|credential/i);
+  });
+  it("suppresses self notifications defensively", () => {
+    expect(shouldSuppressDiscussionNotification({ actorId: "same", recipientId: "same" })).toBe(true);
+    expect(shouldSuppressDiscussionNotification({ actorId: "a", recipientId: "b" })).toBe(false);
+  });
+});

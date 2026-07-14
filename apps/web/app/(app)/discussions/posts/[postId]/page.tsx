@@ -1,0 +1,3 @@
+import { notFound, redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+export default async function DiscussionPostRedirect({ params }: { params: Promise<{ postId: string }> }) { const { postId } = await params; const db = await createSupabaseServerClient(); const { data } = await db.from("discussion_posts").select("discussion_communities!inner(slug)").eq("id", postId).maybeSingle(); const community = data ? (Array.isArray(data.discussion_communities) ? data.discussion_communities[0] : data.discussion_communities) : null; if (!community) notFound(); redirect(`/discussions/c/${community.slug}/posts/${postId}`); }

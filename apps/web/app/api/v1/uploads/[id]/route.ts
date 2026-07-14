@@ -140,7 +140,7 @@ export async function PUT(request: Request, { params }: Params) {
       },
     });
 
-    if (upload.purpose !== "listing") {
+    if (upload.purpose === "avatar" || upload.purpose === "banner") {
       stage = "profile-attachment";
       const { error: attachError } = await context.supabase.rpc(
         "attach_profile_media",

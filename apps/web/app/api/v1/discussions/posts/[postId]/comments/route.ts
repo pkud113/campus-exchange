@@ -1,0 +1,44 @@
+import { discussionCommentInputSchema, type DiscussionComment } from "@campus-exchange/contracts";
+import { NextResponse } from "next/server";
+import { apiData, apiError, decodeCursor, discussionMutationError, encodeCursor, enforceRateLimit, parseJson, requireDiscussions, verifyMutationOrigin } from "@/lib/api";
+import { buildCommentTree } from "@/lib/discussions";
+type Params = { params: Promise<{ postId: string }> };
+
+export async function GET(request: Request, { params }: Params) {
+  const context = await requireDiscussions(request);
+  if (context instanceof NextResponse) return context;
+  const { postId } = await params;
+  const url = new URL(request.url);
+  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit") ?? 20) || 20));
+  const cursor = decodeCursor(url.searchParams.get("cursor") ?? undefined);
+  const { data, error } = await context.supabase.rpc("discussion_comment_tree", { target_post: postId, cursor_created: cursor?.createdAt ?? null, cursor_id: cursor?.id ?? null, root_limit: limit + 1 });
+  if (error) return apiError(request, error.code === "P0002" ? 404 : 500, error.code === "P0002" ? "not_found" : "internal_error", "Unable to load comments.");
+  const rows = (data ?? []) as Array<{ id: string; post_id: string; author_id: string | null; parent_comment_id: string | null; depth: number; body: string | null; score: number; reply_count: number; removed_at: string | null; deleted_at: string | null; created_at: string }>;
+  const ids = rows.map((row) => row.id);
+  const authorIds = [...new Set(rows.flatMap((row) => row.author_id ? [row.author_id] : []))];
+  const [{ data: votes }, { data: authors }] = await Promise.all([
+    ids.length ? context.supabase.from("discussion_comment_votes").select("comment_id,value").eq("profile_id", context.userId).in("comment_id", ids) : Promise.resolve({ data: [] }),
+    authorIds.length ? context.supabase.from("profiles").select("id,handle,display_name").in("id", authorIds) : Promise.resolve({ data: [] })
+  ]);
+  const voteMap = new Map((votes ?? []).map((row) => [row.comment_id, row.value]));
+  const authorMap = new Map((authors ?? []).map((row) => [row.id, { handle: row.handle, display_name: row.display_name }]));
+  const mapped = rows.map((row) => ({ id: row.id, postId: row.post_id, authorId: row.author_id, parentCommentId: row.parent_comment_id, depth: row.depth, body: row.deleted_at ? null : row.body, score: row.score, replyCount: row.reply_count, removedAt: row.removed_at, deletedAt: row.deleted_at, createdAt: row.created_at, viewerVote: (voteMap.get(row.id) ?? 0) as -1 | 0 | 1, ...(row.author_id && authorMap.has(row.author_id) ? { author: authorMap.get(row.author_id) } : {}) } as DiscussionComment));
+  const tree = buildCommentTree(mapped);
+  const page = tree.slice(0, limit);
+  const last = page.at(-1);
+  return apiData(request, { comments: page, total: mapped.length, page: { nextCursor: tree.length > limit && last ? encodeCursor(last.createdAt, last.id) : null } });
+}
+
+export async function POST(request: Request, { params }: Params) {
+  const origin = verifyMutationOrigin(request);
+  if (origin) return origin;
+  const context = await requireDiscussions(request);
+  if (context instanceof NextResponse) return context;
+  const limited = await enforceRateLimit(request, "discussion-comment", context.userId, 60, 3600);
+  if (limited) return limited;
+  const input = await parseJson(request, discussionCommentInputSchema);
+  if (input instanceof NextResponse) return input;
+  const { postId } = await params;
+  const { data, error } = await context.supabase.rpc("create_discussion_comment", { target_post: postId, target_parent: input.parentCommentId, submitted_body: input.body, submitted_key: input.idempotencyKey });
+  return error ? discussionMutationError(request, error, "Unable to add this comment.") : apiData(request, data, 201);
+}

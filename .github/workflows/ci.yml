@@ -21,6 +21,12 @@ jobs:
         run: |
           supabase start
           supabase db reset
+      - name: Lint database functions and schemas
+        run: supabase db lint --local --schema public,private --level error --fail-on error
+      - name: Run pgTAP database tests
+        run: supabase test db --local supabase/tests
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high

@@ -65,7 +65,7 @@ export const messageInputSchema = z.object({
 });
 
 export const reportInputSchema = z.object({
-  targetType: z.enum(["listing", "event", "profile", "message"]),
+  targetType: z.enum(["listing", "event", "profile", "message", "community", "discussion_post", "discussion_comment"]),
   targetId: uuidSchema,
   reason: z.enum(["fraud", "harassment", "prohibited_item", "spam", "unsafe", "other"]),
   details: z.string().trim().max(2000).default(""),
@@ -81,7 +81,72 @@ export const profileSearchSchema = z.object({ q: z.string().trim().min(2).max(80
 export const conversationRequestInputSchema = z.object({ profileId: uuidSchema });
 export const conversationRequestResponseSchema = z.object({ response: z.enum(["accepted", "declined"]) });
 export const contentDeletionSchema = z.object({ reason: z.string().trim().min(3).max(1000).default("User deleted content") });
-export const mediaPurposeSchema = z.enum(["listing", "avatar", "banner"]);
+export const mediaPurposeSchema = z.enum(["listing", "avatar", "banner", "community_icon", "community_banner", "discussion_post"]);
+
+export const discussionSlugSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,32}$/);
+export const discussionPostingPermissionSchema = z.enum(["members", "moderators", "owner"]);
+export const discussionPostTypeSchema = z.enum(["text", "link", "image"]);
+export const discussionSortSchema = z.enum(["hot", "new", "top", "comments"]);
+export const discussionFeedQuerySchema = cursorSchema.extend({
+  sort: discussionSortSchema.default("hot"),
+  q: z.string().trim().max(120).optional()
+});
+
+export const discussionCommunityInputSchema = z.object({
+  slug: discussionSlugSchema,
+  displayName: z.string().trim().min(3).max(80),
+  description: z.string().trim().max(5000).default(""),
+  rules: z.string().trim().max(10000).default(""),
+  postingPermission: discussionPostingPermissionSchema.default("members"),
+  idempotencyKey: uuidSchema
+});
+
+export const discussionCommunityUpdateSchema = z.object({
+  displayName: z.string().trim().min(3).max(80),
+  description: z.string().trim().max(5000),
+  rules: z.string().trim().max(10000),
+  postingPermission: discussionPostingPermissionSchema,
+  commentsEnabled: z.boolean()
+});
+
+export const discussionPostInputSchema = z.object({
+  postType: discussionPostTypeSchema,
+  title: z.string().trim().min(3).max(300),
+  body: z.string().trim().max(20000).default(""),
+  linkUrl: z.string().url().refine((value) => value.startsWith("https://"), "Use an HTTPS link").nullable().default(null),
+  mediaId: uuidSchema.nullable().default(null),
+  idempotencyKey: uuidSchema
+}).superRefine((value, context) => {
+  if (value.postType === "text" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Text posts require a body" });
+  if (value.postType === "link" && !value.linkUrl) context.addIssue({ code: z.ZodIssueCode.custom, path: ["linkUrl"], message: "Link posts require an HTTPS URL" });
+  if (value.postType === "image" && !value.mediaId) context.addIssue({ code: z.ZodIssueCode.custom, path: ["mediaId"], message: "Image posts require an uploaded image" });
+});
+
+export const discussionPostUpdateSchema = z.object({
+  title: z.string().trim().min(3).max(300),
+  body: z.string().trim().max(20000).default(""),
+  linkUrl: z.string().url().refine((value) => value.startsWith("https://"), "Use an HTTPS link").nullable().default(null)
+});
+
+export const discussionCommentInputSchema = z.object({
+  parentCommentId: uuidSchema.nullable().default(null),
+  body: z.string().trim().min(1).max(10000),
+  idempotencyKey: uuidSchema
+});
+export const discussionCommentUpdateSchema = z.object({ body: z.string().trim().min(1).max(10000) });
+export const discussionVoteSchema = z.object({ value: z.union([z.literal(-1), z.literal(1), z.null()]) });
+export const discussionModerationSchema = z.object({
+  action: z.enum(["remove_post", "restore_post", "lock_post", "unlock_post", "pin_post", "unpin_post", "remove_comment", "restore_comment", "ban_member", "unban_member", "add_moderator", "remove_moderator", "archive", "unarchive"]),
+  targetType: z.enum(["community", "post", "comment", "member"]),
+  targetId: uuidSchema,
+  reason: z.string().trim().max(1000).default(""),
+  idempotencyKey: uuidSchema
+});
+export const discussionOwnershipSchema = z.object({
+  newOwnerId: uuidSchema,
+  reason: z.string().trim().min(3).max(1000),
+  idempotencyKey: uuidSchema
+});
 
 export type ApiErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "service_unconfigured" | "internal_error";
 export type ApiError = { error: { code: ApiErrorCode; message: string; requestId: string; details?: unknown } };
@@ -114,4 +179,62 @@ export type CampusEvent = {
   capacity: number | null;
   attendeeCount: number;
   isAttending?: boolean;
+};
+
+export type DiscussionSort = z.infer<typeof discussionSortSchema>;
+export type DiscussionMembershipRole = "owner" | "moderator" | "member";
+export type DiscussionMembershipState = "active" | "banned" | "left";
+export type DiscussionCommunity = {
+  id: string;
+  campusId: string;
+  ownerId: string;
+  slug: string;
+  displayName: string;
+  description: string;
+  rules: string;
+  iconMediaId: string | null;
+  bannerMediaId: string | null;
+  status: "active" | "archived" | "deleted";
+  visibility: "campus_private" | "hidden";
+  postingPermission: z.infer<typeof discussionPostingPermissionSchema>;
+  commentsEnabled: boolean;
+  memberCount: number;
+  postCount: number;
+  createdAt: string;
+  membership?: { role: DiscussionMembershipRole; state: DiscussionMembershipState } | null;
+};
+export type DiscussionPost = {
+  id: string;
+  communityId: string;
+  authorId: string | null;
+  postType: z.infer<typeof discussionPostTypeSchema>;
+  title: string | null;
+  body: string | null;
+  linkUrl: string | null;
+  mediaId: string | null;
+  score: number;
+  commentCount: number;
+  saveCount: number;
+  isPinned: boolean;
+  lockedAt: string | null;
+  removedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+  viewerVote?: -1 | 0 | 1;
+  viewerSaved?: boolean;
+};
+export type DiscussionComment = {
+  id: string;
+  postId: string;
+  authorId: string | null;
+  parentCommentId: string | null;
+  depth: number;
+  body: string | null;
+  score: number;
+  replyCount: number;
+  removedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+  viewerVote?: -1 | 0 | 1;
+  children?: DiscussionComment[];
 };

@@ -4,7 +4,7 @@
 
 Production is `https://campus-exchange.net`, the Supabase project is `campus-exchange`, and the Cloudflare Workers are `campus-exchange-web` and `campus-exchange-worker`. The MSU campus accepts only the explicit `msu.edu` domain. Staff accounts are invitation-only and may use other domains.
 
-Pushing `main` triggers `.github/workflows/deploy-production.yml`. Keep the GitHub `production` environment protected and require manual approval while Phase 1 is rolling out.
+Pushing `main` triggers `.github/workflows/deploy-production.yml`. Keep the GitHub `production` environment protected and require manual approval for the Discussions rollout. Discussions launches immediately to all verified MSU profiles after the protected deployment succeeds.
 
 ## One-time prerequisites
 
@@ -40,8 +40,8 @@ Never put secret/service keys in a `NEXT_PUBLIC_` value, a repository file, a sc
 ## Deployment sequence
 
 1. Verify the paid plans, spend caps, backups, DNS, and email-domain status.
-2. Run locally: `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm test`, and `pnpm build`.
-3. Review the migration `supabase/migrations/202607130001_phase1_foundation.sql` and take the fresh logical backup.
+2. Run locally: `supabase db reset`, `supabase db lint --local --schema public,private --level error --fail-on error`, `supabase test db --local supabase/tests`, `pnpm typecheck`, `pnpm test`, `pnpm build`, and `pnpm audit --prod --audit-level high`.
+3. Review all unapplied migrations, including the timestamped Discussions migration, run linked Supabase security/performance advisors, and take the fresh logical backup.
 4. Push the reviewed commit to `main` and approve the protected `production` workflow.
 5. The workflow validates credentials, runs verification, applies migrations, configures Supabase SMTP/code templates, ensures R2 exists, deploys both Workers, installs runtime secrets, and checks apex/`www` health.
 6. Confirm the workflow and `/api/health` are green. Confirm public pages load, authenticated responses use `private, no-store`, and the service worker contains no authenticated routes.
@@ -82,16 +82,31 @@ The invitation expires after 24 hours and is stored as a SHA-256 email hash. The
 - Moderation: direct page/API denial without role; denial without MFA; report snapshot only; edit/hide/delete content; suspend/restore member; append-only audit entry for every action.
 - Theme/PWA: system default, persisted light/dark override without flash, Turnstile theme, installability, offline public shell, and no offline mutation/private content.
 - Operations: Worker cron health, outbox retry/dead-letter behavior, R2 cleanup, pending-account purge, structured logs without email/message/OTP/signed URL values.
+- Discussions: create a community with an immutable lowercase slug; verify automatic owner membership; join/leave from another verified profile; transfer ownership before the original owner leaves.
+- Discussion posts: create text, HTTPS link, and private-image posts; verify Hot/New/Top/Most Commented cursors; ensure pinned posts lead only inside their own community; edit and soft-delete an owned post.
+- Discussion threads: create a root comment and replies through depth eight, reject depth nine, preserve tombstones after deletion, reject new comments on locked/removed/deleted/archived targets.
+- Discussion engagement: add/repeat/switch/clear post and comment votes, save/unsave repeatedly, and confirm authoritative scores/counters never drift.
+- Community moderation: appoint/remove a moderator, ban/unban a member, pin/lock/remove/restore content, archive/unarchive, and verify append-only audit rows and generic notifications for each eligible action.
+- Discussion reports: report a community, post, and comment; confirm protected snapshots are visible only to eligible community moderators or same-campus AAL2 staff.
+- Discussion isolation: verify cross-campus reads and every mutation fail; verify suspended/banned users cannot participate; verify staff global moderation fails without AAL2 and cannot transfer or assume ownership.
+- Discussion privacy: inspect browser cache/storage to confirm no discussion HTML/API/media is publicly cached; verify no service-role key or original R2 URL reaches the browser.
+- Discussion operations: inspect oldest outbox age/dead letters, discussion report backlog, database load, abandoned attachment cleanup, and 30-day tombstone/media purging.
 
 ## Backups, retention, and maintenance
 
 Supabase Pro supplies daily backups with seven-day retention. Copy an encrypted weekly `pg_dump` to a separate private R2 backup bucket; retain eight weekly and twelve monthly copies. Perform an isolated restore drill before launch and quarterly. Target RPO is 24 hours and RTO four hours.
 
-The scheduled Worker processes outbox events and maintenance. Pending accounts older than 24 hours are deleted. Listings/events/media soft-delete immediately and are permanently purged after 30 days; R2 objects are removed before media rows.
+The scheduled Worker processes outbox events and maintenance. Pending accounts older than 24 hours are deleted. Listings/events/media soft-delete immediately and are permanently purged after 30 days; R2 objects are removed before media rows. Discussion posts/comments retain structural tombstones but purge bodies, links, private attachments, moderation reasons, and permitted author references after 30 days. Deleted community slugs remain reserved. Ready discussion media that never binds to a target is removed after 24 hours.
 
 ## Monitoring and cost controls
 
-Alert on API 5xx above 2% for five minutes, read p95 above 300 ms, write p95 above 500 ms, oldest outbox event above five minutes, any dead letter, database CPU above 70% for 30 minutes, realtime connections above 400, and reports older than four hours. Set projected-cost alerts at $50 and $75. Logs must exclude message bodies, email addresses, codes, signed URLs, and credentials.
+Alert on API 5xx above 2% for five minutes, read p95 above 300 ms, write p95 above 500 ms, oldest outbox event above five minutes, any dead letter, database CPU above 70% for 30 minutes, realtime connections above 400, and reports older than four hours. Monitor slow discussion feed/search queries, vote/save counter drift, cleanup backlog, and community moderation volume. Set projected-cost alerts at $50 and $75. Logs must exclude discussion bodies, message bodies, email addresses, codes, signed URLs, and credentials.
+
+## Discussions kill switch and rollback
+
+`public.runtime_settings.discussions_enabled` defaults to `true`. In an incident, set it to `false` from a trusted operator session to hide discussion navigation on the next application release and make discussion APIs/RLS return no usable data. Do not remove additive discussion tables during emergency rollback.
+
+Rollback order: disable Discussions, redeploy the prior known-good web and scheduled worker artifacts, verify marketplace/events/messaging/authentication, then investigate. The timestamped migration is forward-compatible and remains applied. Re-enable only after database/RLS checks, outbox health, media access, cross-campus isolation, and the full discussion smoke checklist pass.
 
 Scale PostgreSQL vertically only after sustained CPU/latency pressure. Keep PostgreSQL search until indexed search misses its target and revisit realtime before 500 concurrent connections.
 

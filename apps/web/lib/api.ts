@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ApiErrorCode } from "@campus-exchange/contracts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { discussionErrorStatus, mutationOriginStatus } from "@/lib/api-rules";
 
 export type VerifiedContext = { userId: string; campusId: string; requestId: string; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> };
 
@@ -37,6 +38,24 @@ export async function requireVerified(request: Request): Promise<VerifiedContext
   }
 }
 
+export async function requireDiscussions(request: Request): Promise<VerifiedContext | NextResponse> {
+  const context = await requireVerified(request);
+  if (context instanceof NextResponse) return context;
+  const { data, error } = await context.supabase.rpc("discussions_enabled");
+  if (error || data !== true) return apiError(request, 503, "service_unconfigured", "Discussions are temporarily unavailable.");
+  return context;
+}
+
+export function discussionMutationError(request: Request, error: { code?: string; message?: string } | null, fallback: string) {
+  if (!error) return apiError(request, 500, "internal_error", fallback);
+  const status = discussionErrorStatus(error.code);
+  if (status === 409) return apiError(request, status, "conflict", error.message ?? "That value is already in use.");
+  if (status === 404) return apiError(request, status, "not_found", error.message ?? "Discussion content was not found.");
+  if (status === 400) return apiError(request, status, "bad_request", error.message ?? fallback);
+  if (status === 403) return apiError(request, status, "forbidden", error.message ?? "This discussion action is not allowed.");
+  return apiError(request, 500, "internal_error", fallback);
+}
+
 export async function requireStaff(request: Request, allowed: string[] = ["moderator", "admin"]) {
   const context = await requireVerified(request);
   if (context instanceof NextResponse) return context;
@@ -66,10 +85,9 @@ export function decodeCursor(cursor?: string): { createdAt: string; id: string }
 }
 
 export function verifyMutationOrigin(request: Request): NextResponse | null {
-  const origin = request.headers.get("origin");
-  const configured = process.env.APP_ORIGIN;
-  if (origin && configured && origin !== configured) return apiError(request, 403, "forbidden", "Request origin was rejected.");
-  if (request.method !== "DELETE" && !request.headers.get("content-type")?.includes("application/json")) return apiError(request, 400, "bad_request", "Content-Type must be application/json.");
+  const status = mutationOriginStatus(request, process.env.APP_ORIGIN);
+  if (status === 403) return apiError(request, 403, "forbidden", "Request origin was rejected.");
+  if (status === 400) return apiError(request, 400, "bad_request", "Content-Type must be application/json.");
   return null;
 }
 
