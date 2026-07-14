@@ -52,8 +52,15 @@ jobs:
         run: |
           stamp="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
           supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
-          supabase db dump --linked --file database.sql
-          test -s database.sql
-          grep -q "PostgreSQL database dump" database.sql
-          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in database.sql -out "database-$stamp.sql.enc" -pass env:BACKUP_ENCRYPTION_PASSWORD
-          pnpm --dir apps/worker exec wrangler r2 object put "campus-exchange-backups/database/database-$stamp.sql.enc" --file "../../database-$stamp.sql.enc"
+          mkdir database-backup
+          supabase db dump --linked --file database-backup/roles.sql --role-only
+          supabase db dump --linked --file database-backup/schema.sql
+          supabase db dump --linked --file database-backup/data.sql --data-only --use-copy
+          test -s database-backup/roles.sql
+          test -s database-backup/schema.sql
+          test -s database-backup/data.sql
+          sha256sum database-backup/*.sql > database-backup/SHA256SUMS
+          tar -czf "database-$stamp.tar.gz" database-backup
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in "database-$stamp.tar.gz" -out "database-$stamp.tar.gz.enc" -pass env:BACKUP_ENCRYPTION_PASSWORD
+          test -s "database-$stamp.tar.gz.enc"
+          pnpm --dir apps/worker exec wrangler r2 object put "campus-exchange-backups/database/database-$stamp.tar.gz.enc" --file "../../database-$stamp.tar.gz.enc"
