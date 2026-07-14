@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  MessageSquareText,
   Search,
   Settings,
   ShieldCheck,
@@ -40,6 +41,7 @@ type Props = {
   isStaff: boolean;
   notificationCount: number;
   messageCount: number;
+  discussionsEnabled: boolean;
 };
 
 type NavEntry = {
@@ -88,6 +90,7 @@ export function AppNavigation({
   isStaff,
   notificationCount: initialNotificationCount,
   messageCount,
+  discussionsEnabled,
 }: Props) {
   const path = usePathname();
   const [notificationCount, setNotificationCount] = useState(initialNotificationCount);
@@ -175,12 +178,26 @@ export function AppNavigation({
     window.location.assign("/sign-in");
   }
 
+  const homeEntry: NavEntry = { href: "/home", label: "Home", Icon: Home };
+  const marketplaceEntry: NavEntry = { href: "/marketplace", label: "Marketplace", Icon: Store };
+  const discussionsEntry: NavEntry = { href: "/discussions", label: "Discussions", Icon: MessageSquareText };
+  const eventsEntry: NavEntry = { href: "/events", label: "Events", Icon: CalendarDays };
+  const messagesEntry: NavEntry = { href: "/messages", label: "Messages", Icon: MessageCircle, count: messageCount };
+  const notificationsEntry: NavEntry = { href: "/notifications", label: "Notifications", Icon: Bell, count: notificationCount };
   const main: NavEntry[] = [
-    { href: "/home", label: "Home", Icon: Home },
-    { href: "/marketplace", label: "Marketplace", Icon: Store },
-    { href: "/events", label: "Events", Icon: CalendarDays },
-    { href: "/messages", label: "Messages", Icon: MessageCircle, count: messageCount },
-    { href: "/notifications", label: "Notifications", Icon: Bell, count: notificationCount },
+    homeEntry,
+    marketplaceEntry,
+    ...(discussionsEnabled ? [discussionsEntry] : []),
+    eventsEntry,
+    messagesEntry,
+    notificationsEntry,
+  ];
+  const mobile: NavEntry[] = [
+    homeEntry,
+    marketplaceEntry,
+    ...(discussionsEnabled ? [discussionsEntry] : []),
+    eventsEntry,
+    messagesEntry,
   ];
   const management: NavEntry[] = [
     { href: "/my/listings", label: "My listings", Icon: ShoppingBag },
@@ -194,9 +211,6 @@ export function AppNavigation({
     { href: "/settings", label: "Settings", Icon: Settings },
   ];
   const closeMenu = () => setMenuOpen(false);
-  const moreActive = [...main.slice(2, 3), main[4]!, ...management, ...account].some((entry) =>
-    isNavigationActive(path, entry.href),
-  );
 
   return (
     <>
@@ -231,29 +245,17 @@ export function AppNavigation({
       <header className="mobile-header">
         <Brand />
         <div className="mobile-header-actions">
-          <Link href="/marketplace" aria-label="Search marketplace"><Search /></Link>
+          <Link href={discussionsEnabled ? "/discussions" : "/marketplace"} aria-label={discussionsEnabled ? "Search discussions" : "Search marketplace"}><Search /></Link>
           <Link className="mobile-alert-link" href="/notifications" aria-label="Notifications">
             <Bell />
             {notificationCount > 0 && <span className="nav-badge">{formatCount(notificationCount)}</span>}
           </Link>
+          <button type="button" aria-label="Open menu" aria-expanded={menuOpen} aria-controls="mobile-navigation-drawer" onClick={() => setMenuOpen(true)}><Menu /></button>
         </div>
       </header>
 
       <nav className="bottom-nav" aria-label="Mobile navigation">
-        <NavItem entry={main[0]!} path={path} />
-        <NavItem entry={main[1]!} path={path} />
-        <NavItem entry={{ href: "/sell", label: "Sell", Icon: CirclePlus }} path={path} />
-        <NavItem entry={main[3]!} path={path} />
-        <button
-          className={`nav-item nav-button${menuOpen || moreActive ? " active" : ""}`}
-          type="button"
-          aria-expanded={menuOpen}
-          aria-controls="mobile-navigation-drawer"
-          onClick={() => setMenuOpen(true)}
-        >
-          <span className="nav-icon"><Menu aria-hidden="true" /></span>
-          <span className="nav-label">More</span>
-        </button>
+        {mobile.map((entry) => <NavItem entry={entry} path={path} key={entry.href} />)}
       </nav>
 
       {menuOpen && (
@@ -283,7 +285,7 @@ export function AppNavigation({
               <ChevronRight aria-hidden="true" />
             </Link>
             <nav aria-label="More destinations">
-              <NavSection label="Discover" entries={[main[2]!, main[4]!]} path={path} onNavigate={closeMenu} />
+              <NavSection label="Updates" entries={[notificationsEntry]} path={path} onNavigate={closeMenu} />
               <NavSection label="Management" entries={management} path={path} onNavigate={closeMenu} />
               <NavSection label="Account" entries={account} path={path} onNavigate={closeMenu} />
             </nav>
