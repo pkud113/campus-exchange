@@ -2,13 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 
-const PUBLIC_CACHE_PATHS = new Set(["/", "/safety", "/manifest.webmanifest", "/api/openapi.json"]);
+const PUBLIC_CACHE_PATHS = new Set(["/safety", "/manifest.webmanifest", "/api/openapi.json"]);
 
 function securityHeaders(response: NextResponse, requestId: string, pathname: string) {
   response.headers.set("x-request-id", requestId);
   response.headers.set("x-content-type-options", "nosniff");
   response.headers.set("referrer-policy", "strict-origin-when-cross-origin");
   response.headers.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  response.headers.set("strict-transport-security", "max-age=63072000; includeSubDomains; preload");
   response.headers.set("content-security-policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests");
   if (!PUBLIC_CACHE_PATHS.has(pathname)) response.headers.set("cache-control", "private, no-store");
   return response;
@@ -26,6 +27,7 @@ export async function middleware(request: NextRequest) {
   const id = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", id);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   let response = NextResponse.next({ request: { headers: requestHeaders } });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;

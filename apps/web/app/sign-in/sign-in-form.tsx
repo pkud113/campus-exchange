@@ -5,7 +5,7 @@ import { ArrowRight, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 
-export function SignInForm() {
+export function SignInForm({next="/home"}:{next?:string}) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -21,7 +21,7 @@ export function SignInForm() {
     const response = await fetch("/api/v1/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ identifier, password, turnstileToken })
+      body: JSON.stringify({ identifier, password, turnstileToken, next })
     });
     const body = await response.json();
     if (response.ok) window.location.assign(body.data.next ?? "/home");

@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Check, MessageCircle, ShieldCheck, ShoppingBag, Sparkles } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+export const dynamic="force-dynamic";
+
+export default async function Home() {
+  let authenticated=false;try{const db=await createSupabaseServerClient();const{data:{user}}=await db.auth.getUser();authenticated=Boolean(user)}catch{}if(authenticated)redirect("/home");
   return <main className="landing">
     <header className="landing-nav"><Brand/><nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#safety">Safety</a><Link className="button button-small button-dark" href="/sign-in">Student sign in <ArrowRight size={15}/></Link></nav></header>
     <section className="hero">

@@ -2,7 +2,7 @@ name: Backup production database
 
 on:
   schedule:
-    - cron: "17 8 * * 0"
+    - cron: "17 8 * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -26,11 +28,16 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
       - run: pnpm install --frozen-lockfile
       - name: Validate backup credentials
         shell: bash
         run: |
-          test -n "$SUPABASE_DB_URL"
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+          test -n "$SUPABASE_PROJECT_REF"
           test -n "$BACKUP_ENCRYPTION_PASSWORD"
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
@@ -44,6 +51,9 @@ jobs:
         shell: bash
         run: |
           stamp="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
-          pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-acl --file="database.dump"
-          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in database.dump -out "database-$stamp.dump.enc" -pass env:BACKUP_ENCRYPTION_PASSWORD
-          pnpm --dir apps/worker exec wrangler r2 object put "campus-exchange-backups/database/database-$stamp.dump.enc" --file "../../database-$stamp.dump.enc"
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase db dump --linked --file database.sql
+          test -s database.sql
+          grep -q "PostgreSQL database dump" database.sql
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in database.sql -out "database-$stamp.sql.enc" -pass env:BACKUP_ENCRYPTION_PASSWORD
+          pnpm --dir apps/worker exec wrangler r2 object put "campus-exchange-backups/database/database-$stamp.sql.enc" --file "../../database-$stamp.sql.enc"

@@ -9,6 +9,7 @@ export async function POST(request:Request){
   if(input.purpose==="listing"){
     const{data:listing}=await c.supabase.from("listings").select("seller_id,deleted_at").eq("id",input.listingId!).single();
     if(!listing||listing.seller_id!==c.userId||listing.deleted_at)return apiError(request,403,"forbidden","You can only upload images to your own active listing.");
+    await createSupabaseAdminClient().from("media_uploads").update({status:"rejected"}).eq("listing_id",input.listingId!).eq("status","pending").lt("expires_at",new Date().toISOString());
     const{count}=await c.supabase.from("media_uploads").select("id",{count:"exact",head:true}).eq("listing_id",input.listingId!).in("status",["pending","ready"]);
     if((count??0)>=6)return apiError(request,409,"conflict","A listing can have at most six images.");
   }
