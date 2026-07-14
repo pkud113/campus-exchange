@@ -16,9 +16,9 @@
     "resend": "^4.6.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250705.0",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
+    "@cloudflare/workers-types": "^5.20260714.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
     "wrangler": "^4.22.0"
   }
 }
