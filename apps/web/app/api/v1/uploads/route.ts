@@ -14,14 +14,18 @@ import { listingImageTypes, maxImageBytes } from "@/lib/images";
 const schema = z
   .object({
     listingId: z.string().uuid().optional(),
-    purpose: z.enum(["listing", "avatar", "banner"]).default("listing"),
+    communitySlug: z.string().regex(/^[a-z0-9_]{3,32}$/).optional(),
+    purpose: z.enum(["listing", "avatar", "banner", "community_icon", "community_banner", "discussion_post"]).default("listing"),
     contentType: z.enum(listingImageTypes),
     byteSize: z.number().int().min(1).max(maxImageBytes),
     altText: z.string().trim().max(300).default(""),
   })
   .refine(
-    (value) =>
-      value.purpose === "listing" ? Boolean(value.listingId) : !value.listingId,
+    (value) => {
+      if (value.purpose === "listing") return Boolean(value.listingId) && !value.communitySlug;
+      if (value.purpose === "community_icon" || value.purpose === "community_banner") return Boolean(value.communitySlug) && !value.listingId;
+      return !value.listingId && !value.communitySlug;
+    },
     { message: "Upload target does not match its purpose" },
   );
 
@@ -80,6 +84,16 @@ export async function POST(request: Request) {
       );
     }
   }
+  if (input.purpose === "community_icon" || input.purpose === "community_banner") {
+    const { data: community } = await context.supabase
+      .from("discussion_communities")
+      .select("owner_id,deleted_at")
+      .eq("slug", input.communitySlug!)
+      .single();
+    if (!community || community.owner_id !== context.userId || community.deleted_at) {
+      return apiError(request, 403, "forbidden", "Only the community owner can upload community media.");
+    }
+  }
 
   const id = crypto.randomUUID();
   const objectKey = `${context.campusId}/${context.userId}/${input.purpose}/${id}`;
@@ -88,7 +102,7 @@ export async function POST(request: Request) {
     campus_id: context.campusId,
     uploader_id: context.userId,
     listing_id: input.purpose === "listing" ? input.listingId : null,
-    profile_id: input.purpose === "listing" ? null : context.userId,
+    profile_id: input.purpose === "avatar" || input.purpose === "banner" ? context.userId : null,
     purpose: input.purpose,
     object_key: objectKey,
     content_type: input.contentType,
