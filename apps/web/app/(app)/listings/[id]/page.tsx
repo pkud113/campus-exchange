@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, MapPin, ShieldCheck } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
+import { ListingGallery } from "@/components/listing-gallery";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { ListingActions } from "./listing-actions";
@@ -33,30 +34,16 @@ export default async function ListingDetail({ params }: Props) {
   const media = (item.media_uploads ?? []).filter(
     (entry: { status: string }) => entry.status === "ready",
   );
-  const primary = media[0];
   const sellerName = seller?.display_name ?? seller?.handle ?? "Verified student";
   return (
     <main className="dashboard narrow">
       <Link className="back-link" href="/marketplace">
         <ArrowLeft /> Back to marketplace
       </Link>
-      <div className="detail-layout">
-        <div className="detail-media">
-          {primary ? (
-            <img
-              src={`/api/v1/media/${primary.id}?variant=full`}
-              alt={primary.alt_text || item.title}
-            />
-          ) : (
-            <div className="detail-visual sand">
-              <div className={`product-shape shape-${item.category}`}>
-                <i /> <b /> <em />
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="detail-layout listing-detail-layout">
+        <ListingGallery media={media} title={item.title} category={item.category} />
         <section className="detail-copy">
-          <span className="condition-pill">{item.condition.replace("_", " ")}</span>
+          <span className="condition-pill">{item.condition.replaceAll("_", " ")}</span>
           <h1>{item.title}</h1>
           <strong className="detail-price">
             {new Intl.NumberFormat("en-US", {
@@ -66,8 +53,8 @@ export default async function ListingDetail({ params }: Props) {
             }).format(item.price_cents / 100)}
           </strong>
           <p>{item.description}</p>
-          <div className="seller-card">
-            <UserAvatar name={sellerName} mediaId={seller?.avatar_media_id} />
+          <Link className="seller-card" href={`/u/${seller?.handle ?? "member"}`}>
+            <UserAvatar name={sellerName} mediaId={seller?.avatar_media_id} size="large" />
             <div>
               <strong>{sellerName}</strong>
               <span>
@@ -77,7 +64,7 @@ export default async function ListingDetail({ params }: Props) {
                 <MapPin /> Michigan State University
               </small>
             </div>
-          </div>
+          </Link>
           <ListingActions
             listingId={item.id}
             isSeller={item.seller_id === user.id}

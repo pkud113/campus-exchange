@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ProfileSettings } from "../profile/profile-settings";
 import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/ui";
 export const metadata = { title: "Settings" };
 export default async function Settings() {
   const db = await createSupabaseServerClient();
@@ -20,11 +21,7 @@ export default async function Settings() {
   ]);
   return (
     <main className="dashboard narrow">
-      <div className="page-title">
-        <span className="overline">YOUR ACCOUNT</span>
-        <h1>Profile & security</h1>
-        <p>Manage your public campus identity and account protection.</p>
-      </div>
+      <PageHeader eyebrow="YOUR ACCOUNT" title="Profile & security" description="Manage your public campus identity and account protection." />
       <ProfileSettings
         profile={{
           username: profile?.handle ?? "",

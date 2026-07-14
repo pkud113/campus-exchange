@@ -3,6 +3,7 @@ import { CalendarDays, Plus } from "lucide-react";
 import { OwnerContentActions } from "@/components/owner-content-actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/ui";
 export default async function MyEvents() {
   const db = await createSupabaseServerClient();
   const {
@@ -17,16 +18,7 @@ export default async function MyEvents() {
     .order("starts_at", { ascending: false });
   return (
     <main className="dashboard narrow">
-      <div className="page-title page-title-actions">
-        <div>
-          <span className="overline">YOUR CONTENT</span>
-          <h1>My Events</h1>
-        </div>
-        <Link className="button button-primary" href="/events/new">
-          <Plus />
-          Create event
-        </Link>
-      </div>
+      <PageHeader eyebrow="YOUR CONTENT" title="My events" description="Review, edit, and manage the events you organize." actions={<Link className="button button-primary" href="/events/new"><Plus /> Create event</Link>} />
       {data?.length ? (
         <div className="managed-list">
           {data.map((event) => (

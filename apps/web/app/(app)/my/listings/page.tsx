@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, ShoppingBag } from "lucide-react";
-import { ListingCard } from "@/components/listing-card";
+import { ListingCard, type ListingCardItem } from "@/components/listing-card";
+import { PageHeader } from "@/components/ui";
 import { OwnerContentActions } from "@/components/owner-content-actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -13,30 +14,21 @@ export default async function MyListings() {
   const { data } = await db
     .from("listings")
     .select(
-      "id,title,category,condition,price_cents,currency,status,profiles!listings_seller_id_fkey(handle,display_name),media_uploads(id,alt_text,status)",
+      "id,title,category,condition,price_cents,currency,status,created_at,profiles!listings_seller_id_fkey(handle,display_name,avatar_media_id),media_uploads(id,alt_text,status)",
     )
     .eq("seller_id", user.id)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   return (
     <main className="dashboard">
-      <div className="page-title page-title-actions">
-        <div>
-          <span className="overline">YOUR CONTENT</span>
-          <h1>My Listings</h1>
-        </div>
-        <Link className="button button-primary" href="/sell">
-          <Plus />
-          Create listing
-        </Link>
-      </div>
+      <PageHeader eyebrow="YOUR CONTENT" title="My listings" description="Manage the items you have shared with your campus." actions={<Link className="button button-primary" href="/sell"><Plus /> Create listing</Link>} />
       {data?.length ? (
         <div className="managed-grid">
           {data.map((item) => (
-            <article key={item.id}>
-              <ListingCard listing={item as never} />
+            <div key={item.id}>
+              <ListingCard listing={item as ListingCardItem} />
               <OwnerContentActions type="listing" id={item.id} />
-            </article>
+            </div>
           ))}
         </div>
       ) : (
