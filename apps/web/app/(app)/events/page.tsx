@@ -3,6 +3,7 @@ import Link from "next/link";
 import { loadEvents } from "@/lib/loaders";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { RsvpButton } from "./rsvp-button";
+import { PageHeader } from "@/components/ui";
 import { redirect } from "next/navigation";
 export const metadata = { title: "Campus events" };
 export default async function Events() {
@@ -25,17 +26,12 @@ export default async function Events() {
   const attending = new Set((rsvps ?? []).map((item) => item.event_id));
   return (
     <main className="dashboard">
-      <section className="welcome-row">
-        <div>
-          <span className="overline">CAMPUS CALENDAR</span>
-          <h1>Find your next thing.</h1>
-          <p>Real events created by verified members of your campus.</p>
-        </div>
-        <Link className="button button-primary" href="/events/new">
-          <Plus />
-          Create event
-        </Link>
-      </section>
+      <PageHeader
+        eyebrow="CAMPUS CALENDAR"
+        title="Find your next thing."
+        description="Real events created by verified members of your campus."
+        actions={<Link className="button button-primary" href="/events/new"><Plus /> Create event</Link>}
+      />
       {events.length ? (
         <div className="event-grid">
           {events.map((event, index) => (

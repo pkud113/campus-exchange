@@ -1,7 +1,7 @@
 type Props = {
   name: string;
   mediaId?: string | null;
-  size?: "default" | "large" | "profile";
+  size?: "small" | "default" | "large" | "profile";
   tone?: "coral" | "mint" | "lilac" | "sand" | "blue";
   className?: string;
 };
@@ -14,7 +14,13 @@ export function UserAvatar({
   className = "",
 }: Props) {
   const sizeClass =
-    size === "default" ? "" : size === "large" ? "large" : "profile-avatar";
+    size === "default"
+      ? ""
+      : size === "small"
+        ? "avatar-small"
+        : size === "large"
+          ? "large"
+          : "profile-avatar";
   const classes = ["avatar", "user-avatar", sizeClass, tone, className]
     .filter(Boolean)
     .join(" ");

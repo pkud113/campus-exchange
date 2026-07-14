@@ -2,6 +2,12 @@ name: Deploy production
 
 on:
   workflow_dispatch:
+    inputs:
+      web_only:
+        description: Deploy only the web application without database or background-worker changes
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
 
@@ -30,6 +36,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      WEB_ONLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.web_only == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[web-only]')) }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -40,6 +47,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - uses: supabase/setup-cli@v1
+        if: ${{ env.WEB_ONLY != 'true' }}
         with:
           version: 2.109.1
 
@@ -73,11 +81,13 @@ jobs:
       - run: pnpm build
 
       - name: Apply production database migrations
+        if: ${{ env.WEB_ONLY != 'true' }}
         run: |
           supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
           supabase db push --include-all
 
       - name: Configure Supabase Auth email delivery
+        if: ${{ env.WEB_ONLY != 'true' }}
         shell: bash
         run: |
           payload="$(jq -n \
@@ -126,6 +136,7 @@ jobs:
                 and .password_min_length == 12' >/dev/null
 
       - name: Ensure private media bucket exists
+        if: ${{ env.WEB_ONLY != 'true' }}
         shell: bash
         run: |
           if ! pnpm --dir apps/worker exec wrangler r2 bucket list | grep -q 'campus-exchange-media'; then
@@ -146,9 +157,11 @@ jobs:
           printf '%s' "$APP_ORIGIN" | pnpm --dir apps/worker exec wrangler secret put APP_ORIGIN --name campus-exchange-web
 
       - name: Deploy background worker
+        if: ${{ env.WEB_ONLY != 'true' }}
         run: pnpm --filter @campus-exchange/worker run deploy
 
       - name: Configure worker runtime secrets
+        if: ${{ env.WEB_ONLY != 'true' }}
         shell: bash
         run: |
           printf '%s' "$NEXT_PUBLIC_SUPABASE_URL" | pnpm --dir apps/worker exec wrangler secret put SUPABASE_URL --name campus-exchange-worker

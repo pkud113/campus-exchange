@@ -1,6 +1,7 @@
 "use client";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
+  ArrowLeft,
   Ban,
   Check,
   LoaderCircle,
@@ -51,6 +52,7 @@ const one = <T,>(value: T | T[]) => (Array.isArray(value) ? value[0] : value);
 
 export function MessagesClient() {
   const params = useSearchParams();
+  const requestedConversation = params.get("conversation") ?? "";
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [selected, setSelected] = useState("");
@@ -73,11 +75,17 @@ export function MessagesClient() {
     ]);
     if (conversationResponse.ok) {
       setConversations(conversationBody.data);
-      setSelected((value) => value || conversationBody.data[0]?.id || "");
+      setSelected((value) =>
+        value ||
+        requestedConversation ||
+        (window.matchMedia("(max-width: 767px)").matches
+          ? ""
+          : conversationBody.data[0]?.id || ""),
+      );
     }
     if (requestResponse.ok) setRequests(requestBody.data);
     setLoading(false);
-  }, []);
+  }, [requestedConversation]);
   useEffect(() => {
     createSupabaseBrowserClient()
       .auth.getUser()
@@ -217,7 +225,7 @@ export function MessagesClient() {
       </main>
     );
   return (
-    <main className="messages-page">
+    <main className={`messages-page${selected ? " has-selection" : ""}`}>
       <section className="conversation-list">
         <div className="messages-head">
           <span className="overline">PRIVATE & VERIFIED</span>
@@ -356,6 +364,14 @@ export function MessagesClient() {
         {active ? (
           <>
             <header>
+              <button
+                type="button"
+                className="mobile-thread-back"
+                aria-label="Back to conversations"
+                onClick={() => setSelected("")}
+              >
+                <ArrowLeft />
+              </button>
               <UserAvatar
                 name={active.other_display_name ?? active.other_handle}
                 mediaId={active.other_avatar_id}
