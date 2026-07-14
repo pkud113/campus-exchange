@@ -7,6 +7,7 @@ type Env = {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   APP_ORIGIN: string;
+  MEDIA_BUCKET: { delete: (key: string) => Promise<void> };
 };
 
 type OutboxEvent = {
@@ -87,8 +88,31 @@ async function runBatch(env: Env): Promise<number> {
   return processed;
 }
 
+async function runMaintenance(env: Env) {
+  const db = createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const now = new Date().toISOString();
+  const { data: media, error: mediaError } = await db.from("media_uploads").select("id,object_key").lte("purge_after", now).limit(100);
+  if (mediaError) throw mediaError;
+  for (const item of media ?? []) {
+    await env.MEDIA_BUCKET.delete(item.object_key);
+    const { error } = await db.from("media_uploads").delete().eq("id", item.id);
+    if (error) throw error;
+  }
+  const { error: listingError } = await db.from("listings").delete().lte("purge_after", now);
+  if (listingError) throw listingError;
+  const { error: eventError } = await db.from("events").delete().lte("purge_after", now);
+  if (eventError) throw eventError;
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: abandoned, error: abandonedError } = await db.from("profiles").select("id").eq("status", "pending").is("onboarding_completed_at", null).lt("created_at", cutoff).limit(50);
+  if (abandonedError) throw abandonedError;
+  for (const profile of abandoned ?? []) {
+    const { error } = await db.auth.admin.deleteUser(profile.id);
+    if (error) throw error;
+  }
+}
+
 export default {
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) { ctx.waitUntil(runBatch(env)); },
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) { ctx.waitUntil(Promise.all([runBatch(env), runMaintenance(env)])); },
   async fetch(request: Request, env: Env) {
     if (new URL(request.url).pathname !== "/health") return new Response("Not found", { status: 404 });
     return Response.json({ status: "ok", service: "campus-exchange-worker" });

@@ -1,0 +1,2 @@
+import{apiData,apiError,requireVerified}from"@/lib/api";import{NextResponse}from"next/server";
+export async function GET(request:Request){const c=await requireVerified(request);if(c instanceof NextResponse)return c;const{data,error}=await c.supabase.from("events").select("*,event_rsvps(count)").eq("organizer_id",c.userId).is("deleted_at",null).order("starts_at",{ascending:false});return error?apiError(request,500,"internal_error","Unable to load your events."):apiData(request,data??[])}

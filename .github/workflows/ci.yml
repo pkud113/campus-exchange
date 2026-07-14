@@ -12,7 +12,13 @@ jobs:
         with: { version: 10.12.1 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
       - run: pnpm install --frozen-lockfile
+      - name: Validate migrations on local PostgreSQL
+        run: |
+          supabase start
+          supabase db reset
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build

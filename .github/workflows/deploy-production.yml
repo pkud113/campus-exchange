@@ -74,15 +74,22 @@ jobs:
               external_email_enabled: true,
               mailer_autoconfirm: false,
               site_url: $site,
-              uri_allow_list: ($site + "/auth/callback"),
+              uri_allow_list: ($site + "/auth/callback," + $site + "/recover," + $site + "/onboarding"),
               smtp_admin_email: "access@campus-exchange.net",
               smtp_host: "smtp.resend.com",
               smtp_port: "465",
               smtp_user: "resend",
               smtp_pass: $smtp_password,
               smtp_sender_name: "Campus Exchange",
+              password_min_length: 12,
+              mailer_otp_exp: 600,
               mailer_subjects_magic_link: "Your Campus Exchange sign-in code",
-              mailer_templates_magic_link_content: "<h2>Your Campus Exchange code</h2><p>Enter this six-digit code in Campus Exchange:</p><p style=\"font-size:32px;font-weight:700;letter-spacing:6px\">{{ .Token }}</p><p>This code expires shortly. If you did not request it, you can ignore this email.</p>"
+              mailer_templates_magic_link_content: "<h2>Your Campus Exchange code</h2><p>Enter this six-digit code in Campus Exchange:</p><p style=\"font-size:32px;font-weight:700;letter-spacing:6px\">{{ .Token }}</p><p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>",
+              mailer_subjects_recovery: "Your Campus Exchange recovery code",
+              mailer_templates_recovery_content: "<h2>Reset your Campus Exchange password</h2><p>Enter this six-digit recovery code:</p><p style=\"font-size:32px;font-weight:700;letter-spacing:6px\">{{ .Token }}</p><p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>",
+              mailer_subjects_invite: "Your Campus Exchange staff invitation",
+              mailer_templates_invite_content: "<h2>Campus Exchange staff invitation</h2><p>Enter this six-digit invitation code during staff setup:</p><p style=\"font-size:32px;font-weight:700;letter-spacing:6px\">{{ .Token }}</p><p>This code expires in 10 minutes.</p>",
+              mailer_notifications_password_changed_enabled: true
             }')"
           curl --fail-with-body --silent --show-error --retry 3 \
             --request PATCH "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
@@ -93,7 +100,7 @@ jobs:
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
             --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             | jq -e --arg site "$APP_ORIGIN" \
-              '.site_url == $site and .smtp_host == "smtp.resend.com" and .smtp_admin_email == "access@campus-exchange.net" and .mailer_subjects_magic_link == "Your Campus Exchange sign-in code"' >/dev/null
+              '.site_url == $site and .smtp_host == "smtp.resend.com" and .smtp_admin_email == "access@campus-exchange.net" and .mailer_subjects_magic_link == "Your Campus Exchange sign-in code" and .mailer_subjects_recovery == "Your Campus Exchange recovery code" and .password_min_length == 12' >/dev/null
 
       - name: Ensure private media bucket exists
         shell: bash

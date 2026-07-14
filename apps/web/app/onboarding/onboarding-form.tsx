@@ -1,0 +1,10 @@
+"use client";
+
+import { LoaderCircle } from "lucide-react";
+import { useState } from "react";
+
+export function OnboardingForm({existingUsername=""}:{existingUsername?:string}){
+  const[username,setUsername]=useState(existingUsername);const[password,setPassword]=useState("");const[confirm,setConfirm]=useState("");const[busy,setBusy]=useState(false);const[error,setError]=useState("");
+  async function submit(event:React.FormEvent){event.preventDefault();if(password!==confirm){setError("Passwords do not match.");return}setBusy(true);setError("");const response=await fetch("/api/v1/auth/onboarding",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username,password})});const body=await response.json();if(response.ok)window.location.assign(body.data.next??"/home");else{setError(body.error?.message??"Unable to finish setup.");setBusy(false)}}
+  return <form className="auth-form auth-form-stacked" onSubmit={submit}><label>Username<input value={username} onChange={event=>setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"").slice(0,24))} pattern="[a-z0-9_]{3,24}" minLength={3} maxLength={24} readOnly={Boolean(existingUsername)} autoComplete="username" required/><small>{existingUsername?"Your existing username is permanent.":"3–24 lowercase letters, numbers, or underscores. This cannot be changed later."}</small></label><label>Password<input type="password" value={password} onChange={event=>setPassword(event.target.value)} minLength={12} maxLength={72} autoComplete="new-password" required/><small>Use at least 12 characters.</small></label><label>Confirm password<input type="password" value={confirm} onChange={event=>setConfirm(event.target.value)} minLength={12} maxLength={72} autoComplete="new-password" required/></label>{error&&<p className="form-error" role="alert">{error}</p>}<button className="button button-primary button-wide" disabled={busy}>{busy?<><LoaderCircle className="spin"/> Finishing…</>:"Finish account setup"}</button></form>;
+}

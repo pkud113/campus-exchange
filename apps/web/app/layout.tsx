@@ -12,8 +12,9 @@ export const metadata: Metadata = {
   openGraph: { type: "website", title: "Campus Exchange", description: "Campus life, all in one place.", images: [{ url: "/og.png", width: 1732, height: 909, alt: "Campus Exchange — Campus life, all in one place." }] },
   twitter: { card: "summary_large_image", title: "Campus Exchange", description: "Campus life, all in one place.", images: ["/og.png"] }
 };
-export const viewport: Viewport = { themeColor: "#f6f3ec", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: [{media:"(prefers-color-scheme: light)",color:"#f6f3ec"},{media:"(prefers-color-scheme: dark)",color:"#101613"}], colorScheme: "light dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  const themeScript=`(()=>{try{const value=localStorage.getItem('campus-theme')||'system';const resolved=value==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):value;document.documentElement.dataset.theme=resolved;document.documentElement.style.colorScheme=resolved}catch{}})()`;
+  return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{__html:themeScript}}/></head><body>{children}</body></html>;
 }

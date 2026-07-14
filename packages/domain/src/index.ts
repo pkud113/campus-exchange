@@ -29,6 +29,28 @@ export function isVerificationCurrent(verifiedAt: Date, now = new Date()): boole
   return expiresAt > now;
 }
 
+export function validatePassword(password: string): void {
+  if (password.length < 12 || password.length > 72) throw new DomainError("invalid_password", "Password must be between 12 and 72 characters");
+}
+
+export function canRespondToConversationRequest(status: string, isRecipient: boolean): boolean {
+  return status === "pending" && isRecipient;
+}
+
+export function canCreateDirectConversationRequest(input: { requesterId: string; recipientId: string; sameCampus: boolean; blocked: boolean; pendingExists: boolean; conversationExists: boolean }): boolean {
+  return input.requesterId !== input.recipientId && input.sameCampus && !input.blocked && !input.pendingExists && !input.conversationExists;
+}
+
+export function canManageOwnedContent(actorId: string, ownerId: string, isStaff: boolean, hasMfa: boolean): boolean {
+  return actorId === ownerId || (isStaff && hasMfa);
+}
+
+export function purgeAt(deletedAt: Date, retentionDays = 30): Date {
+  const result = new Date(deletedAt);
+  result.setUTCDate(result.getUTCDate() + retentionDays);
+  return result;
+}
+
 export class DomainError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "DomainError"; }
 }
