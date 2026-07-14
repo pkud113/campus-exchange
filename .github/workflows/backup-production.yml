@@ -63,4 +63,8 @@ jobs:
           tar -czf "database-$stamp.tar.gz" database-backup
           openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in "database-$stamp.tar.gz" -out "database-$stamp.tar.gz.enc" -pass env:BACKUP_ENCRYPTION_PASSWORD
           test -s "database-$stamp.tar.gz.enc"
-          pnpm --dir apps/worker exec wrangler r2 object put "campus-exchange-backups/database/database-$stamp.tar.gz.enc" --file "../../database-$stamp.tar.gz.enc"
+          encrypted_digest="$(sha256sum "database-$stamp.tar.gz.enc" | cut -d ' ' -f 1)"
+          object_key="campus-exchange-backups/database/database-$stamp.tar.gz.enc"
+          pnpm --dir apps/worker exec wrangler r2 object put "$object_key" --file "../../database-$stamp.tar.gz.enc" --remote
+          pnpm --dir apps/worker exec wrangler r2 object get "$object_key" --file "../../retrieved-$stamp.tar.gz.enc" --remote
+          echo "$encrypted_digest  retrieved-$stamp.tar.gz.enc" | sha256sum --check
