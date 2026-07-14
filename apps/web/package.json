@@ -17,13 +17,13 @@
     "@campus-exchange/contracts": "workspace:*",
     "@campus-exchange/domain": "workspace:*",
     "@opennextjs/cloudflare": "^1.6.5",
-    "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.50.2",
-    "lucide-react": "^0.468.0",
-    "next": "^15.5.7",
+    "@supabase/ssr": "^0.12.1",
+    "@supabase/supabase-js": "^2.110.3",
+    "lucide-react": "^1.24.0",
+    "next": "^16.2.10",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "zod": "^3.25.67"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",

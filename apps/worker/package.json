@@ -12,8 +12,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.50.2",
-    "resend": "^4.6.0"
+    "@supabase/supabase-js": "^2.110.3",
+    "resend": "^6.17.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",
