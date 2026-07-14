@@ -3,55 +3,42 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ImagePlus, LoaderCircle } from "lucide-react";
-
-const acceptedTypes = new Set(["image/webp", "image/png", "image/jpeg"]);
+import { LoaderCircle } from "lucide-react";
+import { ListingPhotoPicker } from "@/components/listing-photo-picker";
+import {
+  formatUploadFailures,
+  uploadListingFiles,
+  validateListingFiles,
+} from "@/lib/listing-upload-client";
 
 export function ListingForm() {
   const router = useRouter();
   const idempotencyKey = useRef(crypto.randomUUID());
-  const uploadedFiles = useRef(new Set<string>());
-  const preparedUploads = useRef(new Map<string, string>());
+  const uploadedKeys = useRef(new Set<string>());
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
-  async function uploadWithRetry(url: string, file: File) {
-    let response: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      response = await fetch(url, {
-        method: "PUT",
-        headers: { "content-type": file.type },
-        body: file,
-      }).catch(() => null);
-      if (response?.ok || !response || response.status < 500) break;
-    }
-    return response;
-  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const form = new FormData(event.currentTarget);
-    const files = form
-      .getAll("photos")
-      .filter((value): value is File => value instanceof File && value.size > 0)
-      .slice(0, 6);
-    const invalid = files.find(
-      (file) => !acceptedTypes.has(file.type) || file.size > 8 * 1024 * 1024,
-    );
-    if (invalid) {
-      setError(
-        `${invalid.name} must be a WebP, PNG, or JPEG image no larger than 8 MB.`,
-      );
+    const validationError = validateListingFiles(files);
+    if (validationError) {
+      setError(validationError);
       setBusy(false);
       return;
     }
+
+    const form = new FormData(event.currentTarget);
+    const title = String(form.get("title") ?? "");
     setProgress("Saving a private draft…");
     const response = await fetch("/api/v1/listings", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        title: form.get("title"),
+        title,
         description: form.get("description"),
         category: form.get("category"),
         condition: form.get("condition"),
@@ -60,67 +47,30 @@ export function ListingForm() {
         idempotencyKey: idempotencyKey.current,
       }),
     });
-    const body = await response.json();
+    const body = await response.json().catch(() => null);
     if (!response.ok) {
-      setError(body.error?.message ?? "Could not save this listing.");
+      setError(body?.error?.message ?? "Could not save this listing.");
       setBusy(false);
       setProgress("");
       return;
     }
-    const failures: string[] = [];
-    for (const [index, file] of files.entries()) {
-      const fileKey = `${file.name}:${file.size}:${file.lastModified}`;
-      if (uploadedFiles.current.has(fileKey)) continue;
-      setProgress(`Uploading image ${index + 1} of ${files.length}…`);
-      let uploadUrl = preparedUploads.current.get(fileKey);
-      if (!uploadUrl) {
-        const grant = await fetch("/api/v1/uploads", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            listingId: body.data.id,
-            purpose: "listing",
-            contentType: file.type,
-            byteSize: file.size,
-            altText: String(form.get("title")),
-          }),
-        });
-        if (!grant.ok) {
-          const detail = await grant.json().catch(() => null);
-          failures.push(
-            `${file.name}: ${detail?.error?.message ?? "upload could not be prepared"}`,
-          );
-          continue;
-        }
-        const upload = await grant.json();
-        uploadUrl = upload?.data?.uploadUrl;
-        if (typeof uploadUrl !== "string") {
-          failures.push(`${file.name}: upload response was invalid`);
-          continue;
-        }
-        preparedUploads.current.set(fileKey, uploadUrl);
-      }
-      if (!uploadUrl) continue;
-      const put = await uploadWithRetry(uploadUrl, file);
-      if (!put?.ok) {
-        const detail = put ? await put.json().catch(() => null) : null;
-        if (put?.status === 403) preparedUploads.current.delete(fileKey);
-        failures.push(
-          `${file.name}: ${detail?.error?.message ?? "upload failed"}`,
-        );
-      } else {
-        uploadedFiles.current.add(fileKey);
-        preparedUploads.current.delete(fileKey);
-      }
-    }
+
+    const failures = await uploadListingFiles({
+      listingId: body.data.id,
+      title,
+      files,
+      uploadedKeys: uploadedKeys.current,
+      onProgress: setProgress,
+    });
     if (failures.length) {
       setError(
-        `The listing is still a private draft because ${failures.length} image${failures.length === 1 ? "" : "s"} failed. Retry to finish publishing. ${failures.join(" ")}`,
+        `The listing is still a private draft because ${failures.length} image${failures.length === 1 ? "" : "s"} failed. Retry to finish publishing. ${formatUploadFailures(failures)}`,
       );
       setProgress("");
       setBusy(false);
       return;
     }
+
     setProgress("Publishing listing…");
     const publish = await fetch(`/api/v1/listings/${body.data.id}`, {
       method: "PATCH",
@@ -143,23 +93,10 @@ export function ListingForm() {
     router.push(`/listings/${body.data.id}`);
     router.refresh();
   }
+
   return (
     <form className="listing-form" onSubmit={submit}>
-      <section>
-        <h2>Photos</h2>
-        <label className="photo-drop">
-          <ImagePlus />
-          <strong>Add up to 6 photos</strong>
-          <span>WebP, PNG, or JPEG · 8 MB each</span>
-          <input
-            name="photos"
-            type="file"
-            accept="image/webp,image/png,image/jpeg"
-            multiple
-            aria-label="Listing photos"
-          />
-        </label>
-      </section>
+      <ListingPhotoPicker files={files} onChange={setFiles} disabled={busy} />
       <section>
         <h2>Details</h2>
         <label>
@@ -175,7 +112,7 @@ export function ListingForm() {
         <div className="form-row">
           <label>
             Category
-            <select name="category" defaultValue="">
+            <select name="category" defaultValue="" required>
               <option value="" disabled>
                 Choose one
               </option>

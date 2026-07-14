@@ -37,3 +37,24 @@
 [data-theme="dark"] .favorite,[data-theme="dark"] .condition-pill{background:rgba(23,32,27,.92);color:var(--ink)}
 [data-theme="dark"] .severity.high{background:#542d28;color:#ffaaa0}[data-theme="dark"] .severity.medium{background:#4c4024;color:#f5d78b}[data-theme="dark"] .severity.low{background:#263f33;color:#9bddb9}
 @media(max-width:760px){.messages-page .conversation-list{height:38%;border-bottom:1px solid var(--line)}.messages-page .chat-panel{display:flex;height:62%}.messages-head{padding:16px 18px 10px}.messages-head h1{font-size:27px;margin-bottom:8px}.conversation-row{padding:11px 16px}.trade-banner{display:none}.message-stream{padding:12px}.message-composer{padding:9px}.message-composer .button{padding:0 14px}.notification-read-action{justify-items:end;max-width:150px}}
+
+/* Stable avatar geometry across page-specific span and image rules. */
+.avatar.user-avatar{display:inline-grid;place-items:center;align-items:center;justify-content:center;text-align:center;line-height:1;overflow:hidden;object-fit:cover;padding:0;margin-block:0}
+img.avatar.user-avatar{display:block}
+
+/* Listing photo selection and existing-media previews. */
+.photo-preview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.photo-preview{min-width:0;display:grid;grid-template-columns:54px minmax(0,1fr) 30px;align-items:center;gap:9px;padding:8px;border:1px solid var(--line);border-radius:11px;background:var(--cream)}
+.photo-preview.existing{grid-template-columns:64px minmax(0,1fr)}
+.photo-preview>img{width:54px;height:54px;border-radius:8px;object-fit:cover}
+.photo-preview.existing>img{width:64px;height:64px}
+.photo-preview>svg{width:32px;height:32px;justify-self:center;color:var(--muted)}
+.photo-preview strong,.photo-preview small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.photo-preview small{color:var(--muted);font-weight:600;margin-top:3px}
+.photo-preview button{width:30px;height:30px;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;color:var(--muted);cursor:pointer}
+.photo-preview button:hover{background:var(--paper);color:var(--danger)}
+.photo-preview button svg{width:16px}
+.photo-drop.disabled{opacity:.55}
+.photo-drop.disabled input{cursor:not-allowed}
+[data-theme="dark"] .photo-preview{background:#1d2922}
+@media(max-width:760px){.photo-preview-grid{grid-template-columns:1fr}.photo-drop{height:150px!important}}
