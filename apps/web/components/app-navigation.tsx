@@ -30,6 +30,7 @@ import {
   isNavigationActive,
   sidebarPreferenceCookie,
   sidebarPreferenceValue,
+  sidebarToggleLabel,
   SIDEBAR_PREFERENCE_KEY,
 } from "@/lib/navigation";
 import { Brand } from "./brand";
@@ -246,6 +247,7 @@ export function AppNavigation({
     { href: "/settings", label: "Settings", Icon: Settings },
   ];
   const closeMenu = () => setMenuOpen(false);
+  const edgeControlLabel = sidebarToggleLabel(sidebarCollapsed);
 
   function setCollapsed(next: boolean) {
     setSidebarCollapsed(next);
@@ -257,10 +259,10 @@ export function AppNavigation({
 
   return (
     <>
-      <aside className="sidebar" data-collapsed={sidebarCollapsed} inert={sidebarCollapsed} aria-hidden={sidebarCollapsed}>
+      <aside className="sidebar" id="desktop-sidebar" data-collapsed={sidebarCollapsed} inert={sidebarCollapsed} aria-hidden={sidebarCollapsed}>
         <div className="sidebar-brand">
           <Brand />
-          <button className="sidebar-collapse-button" type="button" onClick={() => setCollapsed(true)} aria-label="Collapse sidebar" title="Collapse sidebar">
+          <button className="sidebar-collapse-button" type="button" onClick={() => setCollapsed(true)} aria-controls="desktop-sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar">
             <PanelLeftClose aria-hidden="true" />
           </button>
         </div>
@@ -290,9 +292,23 @@ export function AppNavigation({
         </div>
       </aside>
 
+      <button
+        className="sidebar-edge-control"
+        type="button"
+        data-collapsed={sidebarCollapsed}
+        onClick={() => setCollapsed(!sidebarCollapsed)}
+        aria-controls="desktop-sidebar"
+        aria-expanded={!sidebarCollapsed}
+        aria-label={edgeControlLabel}
+        title={edgeControlLabel}
+      >
+        {sidebarCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
+        <span className="compact-tooltip" aria-hidden="true">{edgeControlLabel}</span>
+      </button>
+
       <header className="compact-app-bar" aria-label="Collapsed desktop navigation">
         <div className="compact-app-bar-start">
-          <button className="compact-icon-button" type="button" onClick={() => setCollapsed(false)} aria-label="Expand sidebar" title="Expand sidebar">
+          <button className="compact-icon-button sidebar-compact-expand" type="button" onClick={() => setCollapsed(false)} aria-controls="desktop-sidebar" aria-expanded="false" aria-label="Expand sidebar" title="Expand sidebar">
             <PanelLeftOpen aria-hidden="true" />
             <span className="compact-tooltip" aria-hidden="true">Expand sidebar</span>
           </button>

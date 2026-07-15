@@ -13,6 +13,10 @@ export function sidebarPreferenceValue(collapsed: boolean) {
   return collapsed ? "collapsed" : "expanded";
 }
 
+export function sidebarToggleLabel(collapsed: boolean) {
+  return collapsed ? "Expand sidebar" : "Collapse sidebar";
+}
+
 export function sidebarPreferenceCookie(collapsed: boolean, secure: boolean) {
   return `${SIDEBAR_PREFERENCE_KEY}=${sidebarPreferenceValue(collapsed)}; Path=/; Max-Age=31536000; SameSite=Lax${secure ? "; Secure" : ""}`;
 }

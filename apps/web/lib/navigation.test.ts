@@ -4,6 +4,7 @@ import {
   isSidebarCollapsed,
   sidebarPreferenceCookie,
   sidebarPreferenceValue,
+  sidebarToggleLabel,
 } from "./navigation";
 
 describe("isNavigationActive", () => {
@@ -32,5 +33,10 @@ describe("isNavigationActive", () => {
     expect(sidebarPreferenceCookie(false, false)).toBe(
       "campus-sidebar=expanded; Path=/; Max-Age=31536000; SameSite=Lax",
     );
+  });
+
+  it("labels the floating edge control for its next action", () => {
+    expect(sidebarToggleLabel(false)).toBe("Collapse sidebar");
+    expect(sidebarToggleLabel(true)).toBe("Expand sidebar");
   });
 });
