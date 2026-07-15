@@ -2,11 +2,12 @@
 
 import { LoaderCircle, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   uploadDiscussionImage,
   validateDiscussionImage,
 } from "@/lib/discussion-upload-client";
+import { DiscussionImagePreview } from "./discussion-image-preview";
 
 type EditablePost = {
   title: string;
@@ -23,19 +24,8 @@ export function PostOwnerActions({ postId, slug, post }: { postId: string; slug:
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [mediaId, setMediaId] = useState(post.media_id);
   const [uploadFailed, setUploadFailed] = useState(false);
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [selectedFile]);
 
   function selectImage(file: File | null) {
     setError("");
@@ -128,7 +118,7 @@ export function PostOwnerActions({ postId, slug, post }: { postId: string; slug:
       <label>Title<input name="title" defaultValue={post.title} minLength={3} maxLength={300} required disabled={busy}/></label>
       {post.post_type === "image" && <label>Replace image (optional)
         <input type="file" accept="image/webp,image/png,image/jpeg,image/heic,image/heif,.heic,.heif" disabled={busy} onChange={(event) => selectImage(event.target.files?.[0] ?? null)}/>
-        <img className="discussion-edit-image" src={previewUrl ?? `/api/v1/media/${mediaId}?variant=card`} alt="Post image preview"/>
+        {selectedFile ? <DiscussionImagePreview file={selectedFile} compact/> : mediaId ? <img className="discussion-edit-image" src={`/api/v1/media/${mediaId}?variant=card`} alt="Post image preview"/> : null}
       </label>}
       {post.post_type === "link" && <label>HTTPS link<input name="linkUrl" defaultValue={post.link_url ?? ""} type="url" pattern="https://.*" required disabled={busy}/></label>}
       <label>{post.post_type === "text" ? "Body" : post.post_type === "image" ? "Text beneath image (optional)" : "Commentary (optional)"}<textarea name="body" defaultValue={post.body ?? ""} maxLength={20000} required={post.post_type === "text"} disabled={busy}/></label>

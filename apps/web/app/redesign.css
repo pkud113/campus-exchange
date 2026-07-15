@@ -687,9 +687,12 @@ svg { flex: 0 0 auto; }
 .comment-copy p { margin: 7px 0; line-height: 1.55; }
 .discussion-image-picker { gap: 7px; }
 .discussion-image-preview { position: relative; display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-subtle); }
-.discussion-image-preview img { display: block; width: 100%; max-height: 460px; object-fit: contain; }
+.discussion-image-preview canvas { display: block; width: 100%; height: auto; max-height: 460px; object-fit: contain; }
+.discussion-image-preview > small { display: block; padding: 28px 12px; color: var(--muted); text-align: center; }
 .discussion-image-preview > span { position: absolute; left: 9px; bottom: 9px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 78%, transparent); color: white; font-size: 10px; font-weight: 800; }
 .discussion-image-preview svg { width: 14px; }
+.discussion-image-preview-compact { width: min(100%, 520px); }
+.discussion-image-preview-compact canvas { max-height: 360px; }
 .inline-editor label { display: grid; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 750; }
 .discussion-edit-image { display: block; width: min(100%, 520px); max-height: 360px; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-subtle); }
 

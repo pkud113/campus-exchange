@@ -1,13 +1,14 @@
 "use client";
 
-import { ImageIcon, LoaderCircle, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { LoaderCircle, RefreshCw } from "lucide-react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   discussionFileKey,
   uploadDiscussionImage,
   validateDiscussionImage,
 } from "@/lib/discussion-upload-client";
+import { DiscussionImagePreview } from "./discussion-image-preview";
 
 type PostType = "text" | "link" | "image";
 
@@ -19,19 +20,8 @@ export function DiscussionPostForm({ slug }: { slug: string }) {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<{ fileKey: string; mediaId: string } | null>(null);
   const [uploadFailed, setUploadFailed] = useState(false);
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [selectedFile]);
 
   function selectImage(file: File | null) {
     setError("");
@@ -127,7 +117,7 @@ export function DiscussionPostForm({ slug }: { slug: string }) {
         Image
         <input name="image" type="file" accept="image/webp,image/png,image/jpeg,image/heic,image/heif,.heic,.heif" required={!selectedFile} disabled={busy} onChange={(event) => selectImage(event.target.files?.[0] ?? null)}/>
         <small>Private JPEG, PNG, WebP, HEIC, or HEIF · 20 MB maximum</small>
-        {previewUrl && <span className="discussion-image-preview"><img src={previewUrl} alt="Selected post preview"/><span><ImageIcon/>Preview</span></span>}
+        {selectedFile && <DiscussionImagePreview file={selectedFile}/>}
       </label>}
       <label>{postType === "text" ? "Body" : postType === "image" ? "Text beneath image (optional)" : "Commentary (optional)"}<textarea name="body" rows={8} maxLength={20000} required={postType === "text"} disabled={busy}/></label>
     </section>
