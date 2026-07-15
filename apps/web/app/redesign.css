@@ -112,12 +112,12 @@ svg { flex: 0 0 auto; }
   transition: transform var(--motion-standard) ease, opacity var(--motion-fast) ease;
 }
 .sidebar[data-collapsed="true"] { transform: translateX(-100%); opacity: 0; pointer-events: none; }
-.sidebar-brand { width: 100%; min-width: 0; padding: 2px 4px 9px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
-.sidebar-brand .brand { min-width: 0; max-width: 100%; overflow: hidden; font-size: 21px; }
-.sidebar-brand .brand > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.sidebar-brand { padding: 2px 4px 9px 12px; }
+.sidebar-brand .brand { font-size: 21px; }
 .sidebar-collapse-button,
 .compact-icon-button,
-.compact-profile-trigger {
+.compact-profile-trigger,
+.sidebar-edge-control {
   position: relative;
   width: 40px;
   height: 40px;
@@ -131,9 +131,23 @@ svg { flex: 0 0 auto; }
 }
 .sidebar-collapse-button:hover,
 .compact-icon-button:hover,
-.compact-profile-trigger:hover { border-color: color-mix(in srgb, var(--green) 30%, var(--line)); background: var(--accent-soft); color: var(--green); }
+.compact-profile-trigger:hover,
+.sidebar-edge-control:hover { border-color: color-mix(in srgb, var(--green) 30%, var(--line)); background: var(--accent-soft); color: var(--green); }
 .sidebar-collapse-button svg,
-.compact-icon-button svg { width: 19px; height: 19px; }
+.compact-icon-button svg,
+.sidebar-edge-control svg { width: 19px; height: 19px; }
+.sidebar-edge-control {
+  position: fixed;
+  top: 24px;
+  left: calc(var(--sidebar-width) - 20px);
+  z-index: 36;
+  display: none;
+  background: var(--paper);
+  box-shadow: var(--elevation-2);
+  transition: left var(--motion-standard) ease, background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease, box-shadow var(--motion-standard) ease, transform var(--motion-fast) ease;
+}
+.sidebar-edge-control[data-collapsed="true"] { left: clamp(14px, 2.3vw, 30px); }
+.sidebar-edge-control:focus-visible { outline: 3px solid color-mix(in srgb, var(--green) 45%, transparent); outline-offset: 3px; }
 .sidebar-nav { display: grid; gap: 20px; }
 .nav-section { display: grid; gap: 7px; }
 .nav-section > h2 {
@@ -288,6 +302,8 @@ svg { flex: 0 0 auto; }
 .compact-nav-item:focus-visible .compact-tooltip,
 .compact-icon-button:hover .compact-tooltip,
 .compact-icon-button:focus-visible .compact-tooltip,
+.sidebar-edge-control:hover .compact-tooltip,
+.sidebar-edge-control:focus-visible .compact-tooltip,
 .compact-profile-trigger:hover .compact-tooltip,
 .compact-profile-trigger:focus-visible .compact-tooltip { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition-delay: 350ms; }
 .compact-profile-menu { position: relative; }
@@ -323,6 +339,12 @@ svg { flex: 0 0 auto; }
 .app-main { min-width: 0; min-height: 100dvh; margin-left: var(--sidebar-width); overflow-x: clip; transition: margin-left var(--motion-standard) ease; }
 .sidebar[data-collapsed="true"] ~ .app-main { margin-left: 0; }
 .mobile-header, .bottom-nav, .mobile-drawer-layer { display: none; }
+
+@media (min-width: 1200px) {
+  .sidebar-collapse-button, .sidebar-compact-expand { display: none; }
+  .sidebar-edge-control { display: grid; }
+  .sidebar[data-collapsed="true"] ~ .compact-app-bar .compact-app-bar-start { padding-left: 50px; }
+}
 
 /* Shared page layouts --------------------------------------------------------- */
 .dashboard {
@@ -584,7 +606,7 @@ svg { flex: 0 0 auto; }
 /* Tablet rail ---------------------------------------------------------------- */
 @media (min-width: 768px) and (max-width: 1199px) {
   .sidebar { width: var(--sidebar-rail); padding: 20px 10px 12px; align-items: stretch; }
-  .sidebar-brand { padding-inline: 0; grid-template-columns: 28px 30px; justify-content: center; gap: 1px; }
+  .sidebar-brand { padding-inline: 0; display: grid; grid-template-columns: 28px 30px; justify-content: center; gap: 1px; }
   .sidebar-brand .brand { width: 28px; max-width: 28px; gap: 0; }
   .sidebar-brand .brand-mark { width: 28px; height: 28px; }
   .sidebar-collapse-button { width: 30px; height: 32px; border: 0; background: transparent; }
