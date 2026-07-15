@@ -12,10 +12,32 @@ type Props = {
 };
 
 export function DiscussionCommentComposer({ expanded, submitting, onExpand, onCancel, onSubmit }: Props) {
+  const composerRef = React.useRef<HTMLFormElement>(null);
+
+  React.useEffect(() => {
+    if (!expanded) return;
+    const frame = requestAnimationFrame(() => {
+      const composer = composerRef.current;
+      if (!composer) return;
+      const lastComment = composer.previousElementSibling?.lastElementChild;
+      if (!(lastComment instanceof HTMLElement) || !lastComment.classList.contains("discussion-comment")) return;
+      const commentRect = lastComment.getBoundingClientRect();
+      const composerRect = composer.getBoundingClientRect();
+      const overlap = commentRect.bottom - composerRect.top + 12;
+      if (commentRect.top < window.innerHeight && commentRect.bottom > 0 && overlap > 0) {
+        window.scrollBy({
+          top: overlap,
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [expanded]);
+
   if (!expanded) {
     return (
       <button
-        className="comment-composer-collapsed"
+        className="discussion-root-composer comment-composer-collapsed"
         type="button"
         aria-expanded="false"
         aria-controls="discussion-root-composer"
@@ -29,7 +51,7 @@ export function DiscussionCommentComposer({ expanded, submitting, onExpand, onCa
   }
 
   return (
-    <form className="comment-composer expanded" id="discussion-root-composer" onSubmit={onSubmit}>
+    <form ref={composerRef} className="discussion-root-composer comment-composer expanded" id="discussion-root-composer" onSubmit={onSubmit}>
       <div className="comment-composer-heading">
         <MessageCircle aria-hidden="true" />
         <span>
