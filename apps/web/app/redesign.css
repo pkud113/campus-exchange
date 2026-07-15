@@ -94,7 +94,7 @@ svg { flex: 0 0 auto; }
 .ui-badge-danger { color: var(--danger); background: var(--danger-soft); }
 
 /* Application shell ----------------------------------------------------------- */
-.app-frame { min-height: 100dvh; }
+.app-frame { min-height: 100dvh; overflow-x: clip; }
 .sidebar {
   position: fixed;
   inset: 0 auto 0 0;
@@ -104,6 +104,7 @@ svg { flex: 0 0 auto; }
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-x: hidden;
   overflow-y: auto;
   background: var(--paper);
   border-right: 1px solid var(--line);
@@ -111,8 +112,9 @@ svg { flex: 0 0 auto; }
   transition: transform var(--motion-standard) ease, opacity var(--motion-fast) ease;
 }
 .sidebar[data-collapsed="true"] { transform: translateX(-100%); opacity: 0; pointer-events: none; }
-.sidebar-brand { padding: 2px 4px 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sidebar-brand .brand { font-size: 21px; }
+.sidebar-brand { width: 100%; min-width: 0; padding: 2px 4px 9px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.sidebar-brand .brand { min-width: 0; max-width: 100%; overflow: hidden; font-size: 21px; }
+.sidebar-brand .brand > span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .sidebar-collapse-button,
 .compact-icon-button,
 .compact-profile-trigger {
@@ -318,7 +320,7 @@ svg { flex: 0 0 auto; }
 .compact-account-menu nav { display: grid; gap: 13px; }
 .compact-account-menu .nav-item::before { left: -14px; }
 .compact-logout { color: var(--danger); }
-.app-main { min-height: 100dvh; margin-left: var(--sidebar-width); transition: margin-left var(--motion-standard) ease; }
+.app-main { min-width: 0; min-height: 100dvh; margin-left: var(--sidebar-width); overflow-x: clip; transition: margin-left var(--motion-standard) ease; }
 .sidebar[data-collapsed="true"] ~ .app-main { margin-left: 0; }
 .mobile-header, .bottom-nav, .mobile-drawer-layer { display: none; }
 
@@ -581,9 +583,9 @@ svg { flex: 0 0 auto; }
 
 /* Tablet rail ---------------------------------------------------------------- */
 @media (min-width: 768px) and (max-width: 1199px) {
-  .sidebar { width: var(--sidebar-rail); padding: 20px 10px 12px; align-items: stretch; overflow-x: hidden; }
-  .sidebar-brand { padding-inline: 0; display: flex; justify-content: center; gap: 1px; }
-  .sidebar-brand .brand { gap: 0; }
+  .sidebar { width: var(--sidebar-rail); padding: 20px 10px 12px; align-items: stretch; }
+  .sidebar-brand { padding-inline: 0; grid-template-columns: 28px 30px; justify-content: center; gap: 1px; }
+  .sidebar-brand .brand { width: 28px; max-width: 28px; gap: 0; }
   .sidebar-brand .brand-mark { width: 28px; height: 28px; }
   .sidebar-collapse-button { width: 30px; height: 32px; border: 0; background: transparent; }
   .sidebar-collapse-button svg { width: 17px; }
@@ -823,10 +825,22 @@ svg { flex: 0 0 auto; }
 .discussion-detail-copy h1 { margin: 8px 0 12px; font-size: 32px; }
 .discussion-detail-image { width: 100%; margin: 12px 0; }
 .discussion-body { margin-top: 12px; line-height: 1.65; }
-.discussion-comments { padding: 17px; border-radius: 12px; }
+.discussion-comments { position: relative; overflow: visible; padding: 17px; border-radius: 12px; }
 .discussion-comments .section-heading { margin-bottom: 12px; }
+.discussion-comment-list {
+  min-width: 0;
+}
+.discussion-comment-list.composer-available { padding-bottom: 76px; }
+.discussion-comment-list.composer-expanded { padding-bottom: 252px; }
+.discussion-root-composer {
+  position: sticky;
+  bottom: 12px;
+  z-index: 12;
+  margin-top: -76px;
+}
+.discussion-comment-list.composer-expanded + .discussion-root-composer { margin-top: -252px; }
 .comment-composer {
-  margin: 16px 0 0;
+  margin: 0;
   padding: 14px;
   justify-items: stretch;
   border: 1px solid color-mix(in srgb, var(--green) 24%, var(--line));
@@ -847,7 +861,7 @@ svg { flex: 0 0 auto; }
 .comment-composer-collapsed {
   width: 100%;
   min-height: 48px;
-  margin-top: 16px;
+  margin: 0;
   padding: 8px 10px 8px 13px;
   display: flex;
   align-items: center;
@@ -892,5 +906,8 @@ svg { flex: 0 0 auto; }
   .discussion-card-image { max-height: 320px; }
   .discussion-detail-copy { padding: 14px 12px; }
   .discussion-comments { padding: 13px 9px; }
+  .discussion-root-composer { bottom: calc(var(--mobile-nav) + env(safe-area-inset-bottom) + 10px); }
+  .discussion-comment-list.composer-expanded { padding-bottom: 264px; }
+  .discussion-comment-list.composer-expanded + .discussion-root-composer { margin-top: -264px; }
   .discussion-comment { margin-left: calc(min(var(--comment-depth), 4) * 7px); grid-template-columns: 2px 38px minmax(0, 1fr); }
 }

@@ -12,6 +12,7 @@ describe("DiscussionCommentComposer", () => {
     );
     expect(markup).toContain("Join the conversation");
     expect(markup).toContain('aria-expanded="false"');
+    expect(markup).toContain("discussion-root-composer comment-composer-collapsed");
     expect(markup).not.toContain("<textarea");
   });
 
@@ -20,6 +21,7 @@ describe("DiscussionCommentComposer", () => {
       <DiscussionCommentComposer expanded submitting onExpand={noop} onCancel={noop} onSubmit={noop} />,
     );
     expect(markup).toContain('id="discussion-root-composer"');
+    expect(markup).toContain("discussion-root-composer comment-composer expanded");
     expect(markup).toContain('maxLength="10000"');
     expect(markup).toContain("Posting…");
     expect(markup).toContain("required");

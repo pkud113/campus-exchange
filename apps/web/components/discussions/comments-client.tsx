@@ -142,9 +142,11 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
 
   return <section className="discussion-comments">
     <div className="section-heading"><div><span className="overline">CONVERSATION</span><h2>{commentCount} {commentCount === 1 ? "comment" : "comments"}</h2></div><MessageCircle/></div>
-    {locked && <p className="discussion-notice">This post is locked. Existing comments remain visible.</p>}
-    {error && <p className="form-error" role="alert">{error}</p>}
-    {loading ? <div className="center-state"><LoaderCircle className="spin"/>Loading comments…</div> : comments.length ? render(comments) : <div className="empty-state compact"><MessageCircle/><h2>No comments yet</h2><p>Start a thoughtful conversation.</p></div>}
+    <div className={`discussion-comment-list${!locked ? composerExpanded ? " composer-expanded" : " composer-available" : ""}`}>
+      {locked && <p className="discussion-notice">This post is locked. Existing comments remain visible.</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {loading ? <div className="center-state"><LoaderCircle className="spin"/>Loading comments…</div> : comments.length ? render(comments) : <div className="empty-state compact"><MessageCircle/><h2>No comments yet</h2><p>Start a thoughtful conversation.</p></div>}
+    </div>
     {!locked && <DiscussionCommentComposer
       expanded={composerExpanded}
       submitting={submitting}
