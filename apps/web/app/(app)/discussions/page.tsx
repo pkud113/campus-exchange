@@ -8,8 +8,8 @@ export const metadata = { title: "Discussions" };
 
 const sorts: DiscussionSort[] = ["hot", "new", "top", "comments"];
 
-export default async function DiscussionsHome({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string }> }) {
-  const { q, sort: rawSort } = await searchParams;
+export default async function DiscussionsHome({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; unavailable?: string }> }) {
+  const { q, sort: rawSort, unavailable } = await searchParams;
   const sort: DiscussionSort = sorts.includes(rawSort as DiscussionSort) ? rawSort as DiscussionSort : "hot";
   const db = await createSupabaseServerClient();
   const { data: { user } } = await db.auth.getUser();
@@ -54,6 +54,7 @@ export default async function DiscussionsHome({ searchParams }: { searchParams: 
       <div><span className="overline">CAMPUS DISCUSSIONS</span><h1>Talk about what matters here.</h1><p>Campus-private communities for questions, ideas, clubs, and everyday student life.</p></div>
       <Link className="button button-primary" href="/discussions/create"><Plus/>Create community</Link>
     </section>
+    {unavailable === "1" && <p className="discussion-notice" role="status">That discussion content is no longer available. Here are the latest campus conversations.</p>}
     <form className="search-panel" action="/discussions"><Search/><input name="q" defaultValue={q} placeholder="Search communities and posts" aria-label="Search discussions"/><button>Search</button></form>
     {q ? <SearchResults q={q}/> : <>
       <section className="discussion-home-grid">

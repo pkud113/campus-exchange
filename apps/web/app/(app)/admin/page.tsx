@@ -6,7 +6,8 @@ import { AdminProfiles } from "./admin-profiles";
 
 export const metadata = { title: "Moderation" };
 
-export default async function Admin() {
+export default async function Admin({ searchParams }: { searchParams: Promise<{ report?: string }> }) {
+  const { report: selectedReportId } = await searchParams;
   const db = await createSupabaseServerClient();
   const {
     data: { user },
@@ -83,7 +84,7 @@ export default async function Admin() {
     }));
   return (
     <>
-      <AdminQueue initialReports={reports ?? []} />
+      <AdminQueue initialReports={reports ?? []} initialSelectedId={selectedReportId} />
       <main className="dashboard">
         <AdminContent initialItems={content} />
         <AdminProfiles initialProfiles={memberProfiles} />

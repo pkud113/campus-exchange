@@ -11,9 +11,9 @@ function SnapshotView({ snapshot, label }: { snapshot: Snapshot; label: string }
   return <div className="report-note"><span>{label}</span>{safeFields.map(([key, value]) => <p key={key}><strong>{key.replaceAll(/([A-Z])/g, " $1")}: </strong>{typeof value === "string" ? value : JSON.stringify(value)}</p>)}</div>;
 }
 
-export function AdminQueue({ initialReports }: { initialReports: Report[] }) {
+export function AdminQueue({ initialReports, initialSelectedId }: { initialReports: Report[]; initialSelectedId?: string | undefined }) {
   const [reports, setReports] = useState(initialReports);
-  const [selectedId, setSelectedId] = useState(initialReports[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(initialReports.some((report) => report.id === initialSelectedId) ? initialSelectedId! : initialReports[0]?.id ?? "");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
