@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deterministicNotificationId, discussionNotificationCopy, retryDelaySeconds, shouldSuppressDiscussionNotification } from "./index";
+import { deliveryErrorMessage, deterministicNotificationId, discussionNotificationCopy, messageNotificationHref, retryDelaySeconds, shouldSuppressDiscussionNotification } from "./index";
 
 describe("worker delivery helpers", () => {
   it("creates stable version-5 UUIDs", async () => {
@@ -16,11 +16,18 @@ describe("worker delivery helpers", () => {
     "discussion.remove_moderator", "discussion.ban_member", "discussion.unban_member",
     "discussion.remove_post", "discussion.remove_comment", "discussion.remove_community", "discussion.ownership_transferred"
   ])("creates generic, content-free copy for %s", (eventType) => {
-    const result = discussionNotificationCopy(eventType, "campus_life", "11111111-1111-1111-1111-111111111111");
+    const result = discussionNotificationCopy(eventType, "campus_life", "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222");
     expect(result.title.length).toBeGreaterThan(3);
     expect(result.body.length).toBeGreaterThan(3);
-    expect(result.href).toBe("/discussions/c/campus_life/posts/11111111-1111-1111-1111-111111111111");
+    expect(result.href).toBe("/discussions/posts/11111111-1111-1111-1111-111111111111#discussion-comment-22222222-2222-2222-2222-222222222222");
     expect(JSON.stringify(result)).not.toMatch(/email|signed url|credential/i);
+  });
+  it("preserves structured delivery errors", () => {
+    expect(deliveryErrorMessage({ message: "conflict target unavailable" })).toBe("conflict target unavailable");
+  });
+  it("keeps message links on the internal messages route", () => {
+    expect(messageNotificationHref("11111111-1111-1111-1111-111111111111")).toBe("/messages?conversation=11111111-1111-1111-1111-111111111111");
+    expect(messageNotificationHref("https://example.com")).toBe("/messages");
   });
   it("suppresses self notifications defensively", () => {
     expect(shouldSuppressDiscussionNotification({ actorId: "same", recipientId: "same" })).toBe(true);

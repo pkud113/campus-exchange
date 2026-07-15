@@ -24,6 +24,7 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
   const key = useRef(crypto.randomUUID());
   const loadSequence = useRef(0);
   const pendingReveal = useRef<string | null>(null);
+  const initialHashReveal = useRef(true);
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -50,11 +51,15 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    const commentId = pendingReveal.current;
+    const hashCommentId = initialHashReveal.current && window.location.hash.startsWith("#discussion-comment-")
+      ? window.location.hash.slice("#discussion-comment-".length)
+      : null;
+    const commentId = pendingReveal.current ?? hashCommentId;
     if (!commentId) return;
     const target = document.getElementById(`discussion-comment-${commentId}`);
     if (!target) return;
     pendingReveal.current = null;
+    initialHashReveal.current = false;
     target.scrollIntoView({
       behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       block: "center",

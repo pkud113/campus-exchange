@@ -6,7 +6,8 @@ import { RsvpButton } from "./rsvp-button";
 import { PageHeader } from "@/components/ui";
 import { redirect } from "next/navigation";
 export const metadata = { title: "Campus events" };
-export default async function Events() {
+export default async function Events({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
+  const { event: targetEventId } = await searchParams;
   const events = await loadEvents();
   const db = await createSupabaseServerClient();
   const {
@@ -32,11 +33,13 @@ export default async function Events() {
         description="Real events created by verified members of your campus."
         actions={<Link className="button button-primary" href="/events/new"><Plus /> Create event</Link>}
       />
+      {targetEventId && !events.some((event) => event.id === targetEventId) && <p className="discussion-notice" role="status">That event is no longer available. Here are the current campus events.</p>}
       {events.length ? (
         <div className="event-grid">
           {events.map((event, index) => (
             <article
-              className={`event-card accent-${["coral", "violet", "green"][index % 3]}`}
+              id={`event-${event.id}`}
+              className={`event-card accent-${["coral", "violet", "green"][index % 3]}${event.id === targetEventId ? " notification-target" : ""}`}
               key={event.id}
             >
               <div className="event-date">

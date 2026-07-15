@@ -74,14 +74,17 @@ export function MessagesClient() {
       requestResponse.json(),
     ]);
     if (conversationResponse.ok) {
-      setConversations(conversationBody.data);
+      const rows = conversationBody.data ?? [];
+      const requestedIsAvailable = !requestedConversation || rows.some((conversation: Conversation) => conversation.id === requestedConversation);
+      setConversations(rows);
       setSelected((value) =>
         value ||
-        requestedConversation ||
+        (requestedIsAvailable ? requestedConversation : "") ||
         (window.matchMedia("(max-width: 767px)").matches
           ? ""
-          : conversationBody.data[0]?.id || ""),
+          : rows[0]?.id || ""),
       );
+      if (!requestedIsAvailable) setError("That conversation is no longer available. Select another conversation to continue.");
     }
     if (requestResponse.ok) setRequests(requestBody.data);
     setLoading(false);

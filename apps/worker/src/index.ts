@@ -29,14 +29,29 @@ export async function deterministicNotificationId(eventId: string, recipientId: 
 
 export function retryDelaySeconds(attemptCount:number){return Math.min(3600,2**attemptCount*15)}
 
+export function deliveryErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message.slice(0, 500);
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") return error.message.slice(0, 500);
+  return "unknown delivery error";
+}
+
 const discussionEventTypes = new Set([
   "discussion.post_replied", "discussion.comment_replied", "discussion.add_moderator",
   "discussion.remove_moderator", "discussion.ban_member", "discussion.unban_member",
   "discussion.remove_post", "discussion.remove_comment", "discussion.remove_community", "discussion.ownership_transferred"
 ]);
 
-export function discussionNotificationCopy(eventType: string, communitySlug: string, postId?: string) {
-  const href = postId ? `/discussions/c/${communitySlug}/posts/${postId}` : `/discussions/c/${communitySlug}`;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const communitySlugPattern = /^[a-z0-9_]{3,32}$/;
+
+export function messageNotificationHref(conversationId: string) {
+  return uuid.test(conversationId) ? `/messages?conversation=${conversationId}` : "/messages";
+}
+
+export function discussionNotificationCopy(eventType: string, communitySlug: string, postId?: string, commentId?: string) {
+  const href = postId && uuid.test(postId)
+    ? `/discussions/posts/${postId}${commentId && uuid.test(commentId) ? `#discussion-comment-${commentId}` : ""}`
+    : communitySlugPattern.test(communitySlug) ? `/discussions/c/${communitySlug}` : "/discussions?unavailable=1";
   const copy: Record<string, { title: string; body: string }> = {
     "discussion.post_replied": { title: "New reply to your post", body: "A campus member replied to your discussion post." },
     "discussion.comment_replied": { title: "New reply to your comment", body: "A campus member replied in a discussion." },
@@ -60,6 +75,7 @@ async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env
   const conversationId = event.payload.conversationId;
   const senderId = event.payload.senderId;
   if (!conversationId || !senderId) throw new Error("invalid message event payload");
+  const href = messageNotificationHref(conversationId);
   const { data: participants, error } = await db.from("conversation_participants").select("profile_id").eq("conversation_id", conversationId).neq("profile_id", senderId);
   if (error) throw error;
   for (const participant of participants ?? []) {
@@ -69,8 +85,8 @@ async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env
     const notificationId = await deterministicNotificationId(event.id, recipientId);
     const { error: notificationError } = await db.from("notifications").upsert({
       id: notificationId, campus_id: event.campus_id, profile_id: recipientId, source_event_id: event.id,
-      kind: "message", title: "New marketplace message", body: "A student sent you a message.", href: `/messages?conversation=${conversationId}`
-    }, { onConflict: "profile_id,source_event_id" });
+      kind: "message", title: "New marketplace message", body: "A student sent you a message.", href
+    }, { onConflict: "id" });
     if (notificationError) throw notificationError;
     // Email is intentionally generic: private message text never enters logs or email payloads.
     if (env.RESEND_API_KEY && env.EMAIL_FROM) {
@@ -78,7 +94,7 @@ async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env
       if (userData.user?.email) {
         const resend = new Resend(env.RESEND_API_KEY);
         const delivery = await resend.emails.send(
-          { from: env.EMAIL_FROM, to: userData.user.email, subject: "New message on Campus Exchange", html: `<p>You have a new marketplace message.</p><p><a href="${env.APP_ORIGIN}/messages?conversation=${conversationId}">Open Campus Exchange</a></p>` },
+          { from: env.EMAIL_FROM, to: userData.user.email, subject: "New message on Campus Exchange", html: `<p>You have a new marketplace message.</p><p><a href="${env.APP_ORIGIN}${href}">Open Campus Exchange</a></p>` },
           { idempotencyKey: `message-${event.id}-${recipientId}` }
         );
         if (delivery.error) throw new Error(`Resend delivery failed: ${delivery.error.name}`);
@@ -98,7 +114,16 @@ async function deliverDiscussionEvent(db: SupabaseClient, event: OutboxEvent, en
     if (error || !data?.slug) throw error ?? new Error("discussion community unavailable");
     communitySlug = data.slug as string;
   }
-  const copy = discussionNotificationCopy(event.event_type, communitySlug, event.payload.postId);
+  let postId = event.payload.postId;
+  let commentId = event.payload.commentId;
+  if (!postId && event.event_type === "discussion.remove_post") postId = event.payload.targetId;
+  if (!postId && event.event_type === "discussion.remove_comment" && event.payload.targetId) {
+    const { data, error } = await db.from("discussion_comments").select("post_id").eq("id", event.payload.targetId).maybeSingle();
+    if (error) throw error;
+    postId = data?.post_id as string | undefined;
+    commentId = event.payload.targetId;
+  }
+  const copy = discussionNotificationCopy(event.event_type, communitySlug, postId, commentId);
   const notificationId = await deterministicNotificationId(event.id, recipientId);
   const { error: notificationError } = await db.from("notifications").upsert({
     id: notificationId,
@@ -109,7 +134,7 @@ async function deliverDiscussionEvent(db: SupabaseClient, event: OutboxEvent, en
     title: copy.title,
     body: copy.body,
     href: copy.href
-  }, { onConflict: "profile_id,source_event_id" });
+  }, { onConflict: "id" });
   if (notificationError) throw notificationError;
   if (env.RESEND_API_KEY && env.EMAIL_FROM) {
     const { data: userData } = await db.auth.admin.getUserById(recipientId);
@@ -148,7 +173,7 @@ async function runBatch(env: Env): Promise<number> {
       await db.from("outbox_events").update({
         status: dead ? "dead_letter" : "pending",
         available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
-        last_error: error instanceof Error ? error.message.slice(0, 500) : "unknown delivery error",
+        last_error: deliveryErrorMessage(error),
         locked_at: null
       }).eq("id", event.id);
       console.error(JSON.stringify({ level: "error", event: "outbox_delivery_failed", outboxId: event.id, attempt: event.attempt_count, dead }));

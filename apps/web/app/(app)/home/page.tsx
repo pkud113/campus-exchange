@@ -17,6 +17,7 @@ import { PageHeader, SectionHeader, SurfaceCard } from "@/components/ui";
 import { loadEvents, loadListings } from "@/lib/loaders";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { notificationHref } from "@/lib/notification-href";
 
 export const metadata = { title: "Home" };
 
@@ -47,7 +48,7 @@ export default async function Home() {
     loadListings({ limit: 8 }),
     loadEvents(),
     db.from("profiles").select("display_name,handle,campuses(name)").eq("id", user.id).single(),
-    db.from("notifications").select("id,title,body,href,created_at,read_at").order("created_at", { ascending: false }).limit(5),
+    db.from("notifications").select("id,kind,title,body,href,created_at,read_at").order("created_at", { ascending: false }).limit(5),
     db.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
     db.from("favorites").select("listing_id,created_at").eq("profile_id", user.id).order("created_at", { ascending: false }).limit(8),
     db.rpc("conversation_inbox"),
@@ -169,7 +170,7 @@ export default async function Home() {
             {notificationsResult.data?.length ? (
               <div className="activity-list notification-activity-list">
                 {notificationsResult.data.map((item) => (
-                  <Link href={item.href ?? "/notifications"} key={item.id}>
+                  <Link href={notificationHref(item.href, item.kind)} key={item.id}>
                     <span className={`activity-icon${item.read_at ? "" : " unread"}`}><Bell /></span>
                     <span><strong>{item.title}</strong><small>{item.body}</small></span>
                   </Link>

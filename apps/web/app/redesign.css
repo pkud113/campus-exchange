@@ -139,14 +139,25 @@ svg { flex: 0 0 auto; }
 .sidebar-edge-control {
   position: fixed;
   top: 24px;
-  left: calc(var(--sidebar-width) - 20px);
+  left: calc(var(--sidebar-width) + 8px);
   z-index: 36;
   display: none;
   background: var(--paper);
   box-shadow: var(--elevation-2);
   transition: left var(--motion-standard) ease, background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease, box-shadow var(--motion-standard) ease, transform var(--motion-fast) ease;
 }
+.sidebar-edge-control::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 9px;
+  height: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
 .sidebar-edge-control[data-collapsed="true"] { left: clamp(14px, 2.3vw, 30px); }
+.sidebar-edge-control[data-collapsed="true"]::before { display: none; }
 .sidebar-edge-control:focus-visible { outline: 3px solid color-mix(in srgb, var(--green) 45%, transparent); outline-offset: 3px; }
 .sidebar-nav { display: grid; gap: 20px; }
 .nav-section { display: grid; gap: 7px; }
