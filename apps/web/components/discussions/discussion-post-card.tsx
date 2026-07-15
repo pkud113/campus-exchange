@@ -31,7 +31,7 @@ export function DiscussionPostCard({ post, showCommunity = false }: { post: Disc
   return <article className="discussion-post-card">
     <DiscussionVote targetType="posts" targetId={post.id} initialScore={post.score} initialVote={post.viewer_vote ?? 0}/>
     <div className="discussion-post-copy">
-      {showCommunity && community && <Link className="community-label" href={`/discussions/c/${community.slug}`}>{community.display_name}</Link>}
+      {showCommunity && community && <Link className="community-label" title={community.display_name} href={`/discussions/c/${community.slug}`}>c/{community.slug}</Link>}
       <div className="discussion-post-meta">
         <span>{author?.display_name ?? author?.handle ?? "Deleted member"}</span>
         <span>{new Date(post.created_at).toLocaleString()}</span>
@@ -40,9 +40,8 @@ export function DiscussionPostCard({ post, showCommunity = false }: { post: Disc
       </div>
       <Link href={href}>
         <h2>{post.title ?? "[deleted]"}</h2>
-        {post.post_type === "image" && post.media_id
-          ? <img className="discussion-card-image" src={`/api/v1/media/${post.media_id}?variant=card`} alt=""/>
-          : <p>{post.body?.slice(0, 320)}</p>}
+        {post.post_type === "image" && post.media_id && <img className="discussion-card-image" src={`/api/v1/media/${post.media_id}?variant=card`} alt={post.title ?? "Discussion image"}/>}
+        {post.body && <p className="discussion-card-body">{post.body.slice(0, 320)}</p>}
       </Link>
       <div className="discussion-post-footer">
         {post.post_type === "link" && post.link_url && <a href={post.link_url} target="_blank" rel="noreferrer"><Link2/>Open link</a>}

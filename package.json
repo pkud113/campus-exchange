@@ -1,7 +1,7 @@
 {
   "name": "campus-exchange",
   "private": true,
-  "packageManager": "pnpm@10.12.1",
+  "packageManager": "pnpm@11.13.0",
   "scripts": {
     "dev": "pnpm --filter @campus-exchange/web dev",
     "build": "pnpm -r build",

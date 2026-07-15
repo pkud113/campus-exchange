@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { discussionCommentInputSchema, discussionCommunityInputSchema, discussionFeedQuerySchema, discussionModerationSchema, discussionOwnershipSchema, discussionPostInputSchema, discussionVoteSchema, reportInputSchema } from "./index";
+import { discussionCommentInputSchema, discussionCommunityInputSchema, discussionFeedQuerySchema, discussionModerationSchema, discussionOwnershipSchema, discussionPostInputSchema, discussionPostUpdateSchema, discussionVoteSchema, reportInputSchema } from "./index";
 
 const key = "11111111-1111-4111-8111-111111111111";
 describe("discussion API contracts", () => {
@@ -11,8 +11,16 @@ describe("discussion API contracts", () => {
     expect(discussionPostInputSchema.safeParse({ postType: "text", title: "Hello", body: "Campus", idempotencyKey: key }).success).toBe(true);
     expect(discussionPostInputSchema.safeParse({ postType: "link", title: "Useful link", linkUrl: "https://example.com", idempotencyKey: key }).success).toBe(true);
     expect(discussionPostInputSchema.safeParse({ postType: "image", title: "Photo", mediaId: key, idempotencyKey: key }).success).toBe(true);
+    expect(discussionPostInputSchema.safeParse({ postType: "image", title: "Photo essay", mediaId: key, body: "Context beneath the image", idempotencyKey: key }).success).toBe(true);
+    expect(discussionPostInputSchema.safeParse({ postType: "link", title: "Useful link", linkUrl: "https://example.com", body: "Why this matters on campus", idempotencyKey: key }).success).toBe(true);
     expect(discussionPostInputSchema.safeParse({ postType: "link", title: "Unsafe", linkUrl: "http://example.com", idempotencyKey: key }).success).toBe(false);
     expect(discussionPostInputSchema.safeParse({ postType: "image", title: "Missing", idempotencyKey: key }).success).toBe(false);
+    expect(discussionPostInputSchema.safeParse({ postType: "text", title: "Wrong attachment", body: "Text", mediaId: key, idempotencyKey: key }).success).toBe(false);
+  });
+  it("validates image bodies and media on post edits", () => {
+    expect(discussionPostUpdateSchema.safeParse({ postType: "image", title: "Updated photo", body: "Updated context", mediaId: key }).success).toBe(true);
+    expect(discussionPostUpdateSchema.safeParse({ postType: "image", title: "Missing image", body: "Context" }).success).toBe(false);
+    expect(discussionPostUpdateSchema.safeParse({ postType: "text", title: "Text only", body: "A body", mediaId: key }).success).toBe(false);
   });
   it("accepts typed cursors and all feed sorts", () => {
     for (const sort of ["hot", "new", "top", "comments"]) expect(discussionFeedQuerySchema.parse({ sort, limit: "25" })).toMatchObject({ sort, limit: 25 });

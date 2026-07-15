@@ -54,6 +54,10 @@ describe("discussion rules", () => {
     expect(() => validateDiscussionPost({ type: "link", linkUrl: "http://example.com" })).toThrow(/HTTPS/i);
     expect(() => validateDiscussionPost({ type: "image" })).toThrow(/media/i);
     expect(() => validateDiscussionPost({ type: "text", body: "Hello campus" })).not.toThrow();
+    expect(() => validateDiscussionPost({ type: "image", mediaId: "media", body: "Optional image context" })).not.toThrow();
+    expect(() => validateDiscussionPost({ type: "link", linkUrl: "https://example.com", body: "Optional link commentary" })).not.toThrow();
+    expect(() => validateDiscussionPost({ type: "text", body: "Text", mediaId: "media" })).toThrow(/Only image posts/i);
+    expect(() => validateDiscussionPost({ type: "image", mediaId: "media", linkUrl: "https://example.com" })).toThrow(/Only link posts/i);
   });
 });
 

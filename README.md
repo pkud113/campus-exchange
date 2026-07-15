@@ -6,7 +6,7 @@ The Discussions release adds campus-private Reddit-style communities, role-based
 
 ## Local development
 
-1. Install Node.js 22, pnpm 10.12.1, Docker Desktop, and the Supabase CLI.
+1. Install Node.js 22, pnpm 11.13.0, Docker Desktop, and the Supabase CLI.
 2. Copy `.env.example` to `apps/web/.env.local` and fill the local Supabase and Turnstile values. Turnstile may be omitted locally.
 3. Run `pnpm install`.
 4. Run `supabase start`, then `supabase db reset`.
