@@ -118,6 +118,8 @@ export function validateDiscussionPost(input: { type: "text" | "link" | "image";
   if (input.type === "text" && !input.body?.trim()) throw new DomainError("body_required", "Text posts require a body");
   if (input.type === "link" && (!input.linkUrl || !input.linkUrl.startsWith("https://"))) throw new DomainError("https_link_required", "Link posts require an HTTPS URL");
   if (input.type === "image" && !input.mediaId) throw new DomainError("media_required", "Image posts require uploaded media");
+  if (input.type !== "link" && input.linkUrl) throw new DomainError("unexpected_link", "Only link posts can include a link");
+  if (input.type !== "image" && input.mediaId) throw new DomainError("unexpected_media", "Only image posts can include uploaded media");
 }
 
 export class DomainError extends Error {

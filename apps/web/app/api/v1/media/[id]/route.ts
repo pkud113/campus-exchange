@@ -16,7 +16,7 @@ type MediaEnv = {
 };
 type Params = { params: Promise<{ id: string }> };
 
-const variantWidths = { thumb: 320, card: 720, full: 1600 } as const;
+const variantWidths = { thumb: 320, card: 720, full: 1600, hero: 1600 } as const;
 
 export async function GET(request: Request, { params }: Params) {
   const context = await requireVerified(request);

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(45);
 
 insert into public.campuses(id,name,slug,timezone) values
   ('00000000-0000-4000-8000-000000000002','Other University','other-university','America/Chicago') on conflict do nothing;
@@ -26,6 +26,8 @@ update public.profiles set status='suspended' where id='10000000-0000-4000-8000-
 update public.profiles set account_kind='staff',verified_until=null where id='10000000-0000-4000-8000-000000000005';
 insert into public.role_assignments(profile_id,campus_id,role) values
   ('10000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000001','moderator');
+insert into public.media_uploads(id,campus_id,uploader_id,object_key,content_type,byte_size,status,purpose,alt_text) values
+  ('30000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','discussion/image-one','image/png',1024,'ready','discussion_post','Campus image');
 
 select ok((select relrowsecurity from pg_class where oid='public.discussion_communities'::regclass),'community RLS enabled');
 select ok((select relrowsecurity from pg_class where oid='public.discussion_posts'::regclass),'post RLS enabled');
@@ -36,6 +38,8 @@ select ok(not has_table_privilege('authenticated','public.discussion_post_votes'
 select ok(has_function_privilege('authenticated','public.create_discussion_community(text,text,text,text,public.discussion_posting_permission,uuid)','EXECUTE'),'community RPC executable');
 select ok(has_function_privilege('authenticated','public.set_discussion_vote(text,uuid,smallint)','EXECUTE'),'vote RPC executable');
 select ok(has_function_privilege('authenticated','public.discussion_comment_tree(uuid,timestamptz,uuid,integer)','EXECUTE'),'recursive comment RPC executable');
+select ok(has_table_privilege('authenticated','public.media_uploads','SELECT'),'upload owners can read their grant state');
+select ok(has_function_privilege('authenticated','public.update_discussion_post(uuid,text,text,text,uuid)','EXECUTE'),'image-aware post update RPC executable');
 
 select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
 set local role authenticated;
@@ -50,6 +54,17 @@ select lives_ok($$select public.set_discussion_membership('campus_life',true)$$,
 select is((select member_count from public.discussion_communities where slug='campus_life'),2,'duplicate join does not inflate counter');
 select lives_ok($$select public.create_discussion_post('campus_life','text','First campus post','A useful body',null,null,'20000000-0000-4000-8000-000000000002')$$,'active member creates text post');
 select is((select post_count from public.discussion_communities where slug='campus_life'),1,'post counter maintained transactionally');
+select lives_ok($$select public.create_discussion_post('campus_life','image','Campus photo','Context displayed beneath the image',null,'30000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000013')$$,'image post accepts an optional text body');
+select is((select body from public.discussion_posts where title='Campus photo'),'Context displayed beneath the image','image post body is stored');
+select ok((select attached_at is not null and discussion_post_id is not null from public.media_uploads where id='30000000-0000-4000-8000-000000000001'),'new image media is attached exactly once');
+reset role;
+insert into public.media_uploads(id,campus_id,uploader_id,object_key,content_type,byte_size,status,purpose,alt_text) values
+  ('30000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','discussion/image-two','image/png',1024,'ready','discussion_post','Replacement image');
+set local role authenticated;
+select lives_ok($$select public.update_discussion_post((select id from public.discussion_posts where title='Campus photo'),'Campus photo updated','Updated text beneath the replacement',null,'30000000-0000-4000-8000-000000000002')$$,'image post replacement is atomic');
+select is((select body from public.discussion_posts where title='Campus photo updated'),'Updated text beneath the replacement','image body remains editable');
+select is((select status from public.media_uploads where id='30000000-0000-4000-8000-000000000001'),'deleted','replaced media is scheduled for cleanup');
+select throws_ok($$select public.update_discussion_post((select id from public.discussion_posts where title='Campus photo updated'),'Campus photo updated','Still has context',null,null)$$,'23514','image posts require uploaded media','image attachment cannot be removed without replacement');
 select is((select public.set_discussion_vote('post',(select id from public.discussion_posts where title='First campus post'),1::smallint)),1,'first upvote sets score');
 select is((select public.set_discussion_vote('post',(select id from public.discussion_posts where title='First campus post'),1::smallint)),1,'repeated upvote is idempotent');
 select is((select public.set_discussion_vote('post',(select id from public.discussion_posts where title='First campus post'),(-1)::smallint)),-1,'vote switching applies delta');

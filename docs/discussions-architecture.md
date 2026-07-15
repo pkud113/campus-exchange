@@ -21,11 +21,13 @@ Keyset indexes support:
 - Most Commented: `comment_count DESC, created_at DESC, id DESC`
 - Hot: `3 × sign(E) × ln(1 + abs(E)) + created_epoch / 259200`, `E = score + 2 × comment_count`, then UUID
 
-The Hot expression is a three-day age-decay ranking up to a row-independent constant. Pinned posts are promoted only within their community. Campus-scoped search uses PostgreSQL full-text vectors and trigram indexes. Comment depth is derived in PostgreSQL and capped at eight; the API retrieves a post's comments in one ordered query and assembles the tree without N+1 queries.
+The Hot expression is a three-day age-decay ranking up to a row-independent constant. Pinned posts are promoted only within their community. Campus-scoped search uses PostgreSQL full-text vectors and trigram indexes. Comment depth is derived in PostgreSQL and capped at eight; the API retrieves a post's comments in one ordered query and assembles the tree without N+1 queries. Successful comment responses include the normalized row plus authoritative post/parent counts so clients insert immediately. Post-scoped Realtime changes trigger a debounced no-store refresh, and comment IDs are deduplicated when the mutation response and Realtime delivery overlap.
 
 ## Media, notifications, and retention
 
-Community icons/banners and discussion images reuse the private R2/Images pipeline. A ready upload belongs to one uploader and may bind exactly once through an RPC. Signed upload URLs are short-lived; original bucket URLs stay private. Unattached ready media is removed after 24 hours.
+Community icons/banners and discussion images reuse the private R2/Images pipeline. The first-party upload endpoint issues a ten-minute database grant, validates declared and detected type/size/dimensions, transforms when Cloudflare Images is available, writes R2 before marking the row ready, and supports bounded retry plus grant renewal. `authenticated` has explicit read access to `media_uploads`, with RLS restricting pending grants to the uploader and campus. A ready upload belongs to one uploader and may bind exactly once through a locked post RPC. Image replacement attaches the new object and schedules the old object for cleanup atomically. Browser previews use local object URLs; original bucket URLs stay private. Unattached ready media is removed after 24 hours.
+
+Post content constraints allow text posts with required body, image posts with required media and optional body, and HTTPS link posts with optional commentary. Link/media fields cannot be mixed into other post types. The same invariants apply to creation and editing.
 
 Outbox events cover post/comment replies, moderator changes, bans/unbans, content removal, and ownership transfer. Database triggers suppress known self-notifications and the worker checks again defensively. Notification IDs derive deterministically from event and recipient IDs. Email/log text is generic and excludes content, email addresses, URLs containing signatures, and credentials. Delivery retries exponentially, caps at one hour, and dead-letters after the configured attempt threshold.
 

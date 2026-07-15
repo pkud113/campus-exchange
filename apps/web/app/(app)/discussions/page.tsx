@@ -1,8 +1,84 @@
+import type { DiscussionSort } from "@campus-exchange/contracts";
 import Link from "next/link";
 import { Compass, Plus, Search, Sparkles, Users } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { DiscussionPostCard } from "@/components/discussions/discussion-post-card";
-export const metadata={title:"Discussions"};
-export default async function DiscussionsHome({searchParams}:{searchParams:Promise<{q?:string}>}){const{q}=await searchParams;const db=await createSupabaseServerClient();const{data:{user}}=await db.auth.getUser();const{data:memberships}=user?await db.from("discussion_memberships").select("community_id").eq("profile_id",user.id).eq("state","active"):{data:[]};const joined=(memberships??[]).map(row=>row.community_id);const[popular,newest,trending,feed]=await Promise.all([db.from("discussion_communities").select("*").eq("status","active").is("deleted_at",null).order("member_count",{ascending:false}).limit(5),db.from("discussion_communities").select("*").eq("status","active").is("deleted_at",null).order("created_at",{ascending:false}).limit(5),db.from("discussion_posts").select("*,discussion_communities!inner(slug,display_name),profiles!discussion_posts_author_id_fkey(handle,display_name)").is("deleted_at",null).is("removed_at",null).order("hot_rank",{ascending:false}).limit(6),joined.length?db.from("discussion_posts").select("*,discussion_communities!inner(slug,display_name),profiles!discussion_posts_author_id_fkey(handle,display_name)").in("community_id",joined).is("deleted_at",null).is("removed_at",null).order("hot_rank",{ascending:false}).limit(20):Promise.resolve({data:[]})]);return <main className="dashboard discussions-home"><section className="welcome-row"><div><span className="overline">CAMPUS DISCUSSIONS</span><h1>Talk about what matters here.</h1><p>Campus-private communities for questions, ideas, clubs, and everyday student life.</p></div><Link className="button button-primary" href="/discussions/create"><Plus/>Create community</Link></section><form className="search-panel" action="/discussions"><Search/><input name="q" defaultValue={q} placeholder="Search communities and posts" aria-label="Search discussions"/><button>Search</button></form>{q?<SearchResults q={q}/>:<><section className="discussion-home-grid"><div className="discussion-feed"><div className="section-heading"><div><span className="overline">YOUR COMMUNITIES</span><h2>Joined feed</h2></div><Link href="/discussions/my-communities">Manage</Link></div>{feed.data?.length?feed.data.map(post=><DiscussionPostCard key={post.id} post={post as never} showCommunity/>):<div className="empty-state"><Users/><h2>Your feed is ready to grow</h2><p>Join a community to collect its posts here.</p></div>}</div><aside className="discussion-sidebar"><CommunityList title="Popular on campus" icon={<Sparkles/>} rows={popular.data??[]}/><CommunityList title="Newest communities" icon={<Compass/>} rows={newest.data??[]}/><Link className="button button-ghost button-wide" href="/discussions/saved">Saved posts</Link></aside></section><section className="content-section"><div className="section-heading"><div><span className="overline">TRENDING</span><h2>Campus conversations</h2></div></div><div className="discussion-trending-grid">{trending.data?.map(post=><DiscussionPostCard key={post.id} post={post as never} showCommunity/>)}</div></section></>}</main>}
-async function SearchResults({q}:{q:string}){const db=await createSupabaseServerClient();const safe=q.replace(/[%_,.*]/g,"");const[communities,posts]=await Promise.all([db.from("discussion_communities").select("*").or(`display_name.ilike.*${safe}*,slug.ilike.*${safe}*`).eq("status","active").is("deleted_at",null).limit(20),db.from("discussion_posts").select("*,discussion_communities!inner(slug,display_name),profiles!discussion_posts_author_id_fkey(handle,display_name)").textSearch("search_vector",q,{type:"websearch",config:"english"}).is("deleted_at",null).is("removed_at",null).limit(30)]);return <section className="discussion-search-results"><CommunityList title="Matching communities" icon={<Users/>} rows={communities.data??[]}/><div><h2>Matching posts</h2>{posts.data?.length?posts.data.map(post=><DiscussionPostCard key={post.id} post={post as never} showCommunity/>):<div className="empty-state"><Search/><h2>No posts found</h2></div>}</div></section>}
-function CommunityList({title,icon,rows}:{title:string;icon:React.ReactNode;rows:any[]}){return <section className="community-list-card"><h2>{icon}{title}</h2>{rows.length?rows.map(row=><Link href={`/discussions/c/${row.slug}`} key={row.id}><span className="community-mini-icon">{row.icon_media_id?<img src={`/api/v1/media/${row.icon_media_id}?variant=thumb`} alt=""/>:row.display_name.slice(0,1)}</span><div><strong>{row.display_name}</strong><small>{row.member_count} members · {row.post_count} posts</small></div></Link>):<p>No communities yet.</p>}</section>}
+import { DiscussionPostCard, type DiscussionPostRow } from "@/components/discussions/discussion-post-card";
+
+export const metadata = { title: "Discussions" };
+
+const sorts: DiscussionSort[] = ["hot", "new", "top", "comments"];
+
+export default async function DiscussionsHome({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string }> }) {
+  const { q, sort: rawSort } = await searchParams;
+  const sort: DiscussionSort = sorts.includes(rawSort as DiscussionSort) ? rawSort as DiscussionSort : "hot";
+  const db = await createSupabaseServerClient();
+  const { data: { user } } = await db.auth.getUser();
+  const { data: memberships } = user
+    ? await db.from("discussion_memberships").select("community_id").eq("profile_id", user.id).eq("state", "active")
+    : { data: [] };
+  const joined = (memberships ?? []).map((row) => row.community_id);
+
+  let joinedQuery = db
+    .from("discussion_posts")
+    .select("*,discussion_communities!inner(slug,display_name),profiles!discussion_posts_author_id_fkey(handle,display_name)")
+    .in("community_id", joined.length ? joined : ["00000000-0000-0000-0000-000000000000"])
+    .is("deleted_at", null)
+    .is("removed_at", null)
+    .limit(30);
+  if (sort === "new") joinedQuery = joinedQuery.order("created_at", { ascending: false }).order("id", { ascending: false });
+  else if (sort === "top") joinedQuery = joinedQuery.order("score", { ascending: false }).order("created_at", { ascending: false });
+  else if (sort === "comments") joinedQuery = joinedQuery.order("comment_count", { ascending: false }).order("created_at", { ascending: false });
+  else joinedQuery = joinedQuery.order("hot_rank", { ascending: false }).order("id", { ascending: false });
+
+  const [popular, newest, trending, joinedFeed] = await Promise.all([
+    db.from("discussion_communities").select("*").eq("status", "active").is("deleted_at", null).order("member_count", { ascending: false }).limit(5),
+    db.from("discussion_communities").select("*").eq("status", "active").is("deleted_at", null).order("created_at", { ascending: false }).limit(5),
+    db.from("discussion_posts").select("*,discussion_communities!inner(slug,display_name),profiles!discussion_posts_author_id_fkey(handle,display_name)").is("deleted_at", null).is("removed_at", null).order("hot_rank", { ascending: false }).limit(6),
+    joinedQuery,
+  ]);
+
+  const allRows = [...(joinedFeed.data ?? []), ...(trending.data ?? [])];
+  const ids = [...new Set(allRows.map((post) => post.id))];
+  const [votes, saves] = user && ids.length ? await Promise.all([
+    db.from("discussion_post_votes").select("post_id,value").eq("profile_id", user.id).in("post_id", ids),
+    db.from("discussion_saved_posts").select("post_id").eq("profile_id", user.id).in("post_id", ids),
+  ]) : [{ data: [] }, { data: [] }];
+  const voteMap = new Map((votes.data ?? []).map((vote) => [vote.post_id, vote.value]));
+  const savedSet = new Set((saves.data ?? []).map((save) => save.post_id));
+  const withViewerState = (post: DiscussionPostRow) => ({ ...post, viewer_vote: voteMap.get(post.id) ?? 0, viewer_saved: savedSet.has(post.id) } as DiscussionPostRow);
+  const feed = (joinedFeed.data ?? []).map((post) => withViewerState(post as DiscussionPostRow));
+  const trendingPosts = (trending.data ?? []).map((post) => withViewerState(post as DiscussionPostRow));
+
+  return <main className="dashboard discussions-home">
+    <section className="welcome-row">
+      <div><span className="overline">CAMPUS DISCUSSIONS</span><h1>Talk about what matters here.</h1><p>Campus-private communities for questions, ideas, clubs, and everyday student life.</p></div>
+      <Link className="button button-primary" href="/discussions/create"><Plus/>Create community</Link>
+    </section>
+    <form className="search-panel" action="/discussions"><Search/><input name="q" defaultValue={q} placeholder="Search communities and posts" aria-label="Search discussions"/><button>Search</button></form>
+    {q ? <SearchResults q={q}/> : <>
+      <section className="discussion-home-grid">
+        <div className="discussion-feed">
+          <div className="section-heading"><div><span className="overline">YOUR COMMUNITIES</span><h2>Joined feed</h2></div><Link href="/discussions/my-communities">Manage</Link></div>
+          <nav className="discussion-sort" aria-label="Joined feed sorting">{sorts.map((value) => <Link className={sort === value ? "active" : ""} href={`/discussions?sort=${value}`} key={value}>{value === "comments" ? "Most commented" : value}</Link>)}</nav>
+          {feed.length ? feed.map((post) => <DiscussionPostCard key={post.id} post={post} showCommunity/>) : <div className="empty-state"><Users/><h2>Your feed is ready to grow</h2><p>Join a community to collect its posts here.</p></div>}
+        </div>
+        <aside className="discussion-sidebar"><CommunityList title="Popular on campus" icon={<Sparkles/>} rows={popular.data ?? []}/><CommunityList title="Newest communities" icon={<Compass/>} rows={newest.data ?? []}/><Link className="button button-ghost button-wide" href="/discussions/saved">Saved posts</Link></aside>
+      </section>
+      <section className="content-section"><div className="section-heading"><div><span className="overline">TRENDING</span><h2>Campus conversations</h2></div></div><div className="discussion-trending-grid">{trendingPosts.map((post) => <DiscussionPostCard key={post.id} post={post} showCommunity/>)}</div></section>
+    </>}
+  </main>;
+}
+
+async function SearchResults({ q }: { q: string }) {
+  const db = await createSupabaseServerClient();
+  const safe = q.replace(/[%_,.*]/g, "");
+  const [communities, posts] = await Promise.all([
+    db.from("discussion_communities").select("*").or(`display_name.ilike.*${safe}*,slug.ilike.*${safe}*`).eq("status", "active").is("deleted_at", null).limit(20),
+    db.from("discussion_posts").select("*,discussion_communities!inner(slug,display_name),profiles!discussion_posts_author_id_fkey(handle,display_name)").textSearch("search_vector", q, { type: "websearch", config: "english" }).is("deleted_at", null).is("removed_at", null).limit(30),
+  ]);
+  return <section className="discussion-search-results"><CommunityList title="Matching communities" icon={<Users/>} rows={communities.data ?? []}/><div><h2>Matching posts</h2>{posts.data?.length ? posts.data.map((post) => <DiscussionPostCard key={post.id} post={post as DiscussionPostRow} showCommunity/>) : <div className="empty-state"><Search/><h2>No posts found</h2></div>}</div></section>;
+}
+
+function CommunityList({ title, icon, rows }: { title: string; icon: React.ReactNode; rows: Array<{ id: string; slug: string; display_name: string; icon_media_id: string | null; member_count: number; post_count: number }> }) {
+  return <section className="community-list-card"><h2>{icon}{title}</h2>{rows.length ? rows.map((row) => <Link href={`/discussions/c/${row.slug}`} key={row.id}><span className="community-mini-icon">{row.icon_media_id ? <img src={`/api/v1/media/${row.icon_media_id}?variant=thumb`} alt=""/> : row.display_name.slice(0, 1)}</span><div><strong>{row.display_name}</strong><small>c/{row.slug} · {row.member_count} members · {row.post_count} posts</small></div></Link>) : <p>No communities yet.</p>}</section>;
+}

@@ -120,12 +120,22 @@ export const discussionPostInputSchema = z.object({
   if (value.postType === "text" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Text posts require a body" });
   if (value.postType === "link" && !value.linkUrl) context.addIssue({ code: z.ZodIssueCode.custom, path: ["linkUrl"], message: "Link posts require an HTTPS URL" });
   if (value.postType === "image" && !value.mediaId) context.addIssue({ code: z.ZodIssueCode.custom, path: ["mediaId"], message: "Image posts require an uploaded image" });
+  if (value.postType !== "link" && value.linkUrl) context.addIssue({ code: z.ZodIssueCode.custom, path: ["linkUrl"], message: "Only link posts can include a link" });
+  if (value.postType !== "image" && value.mediaId) context.addIssue({ code: z.ZodIssueCode.custom, path: ["mediaId"], message: "Only image posts can include uploaded media" });
 });
 
 export const discussionPostUpdateSchema = z.object({
+  postType: discussionPostTypeSchema,
   title: z.string().trim().min(3).max(300),
   body: z.string().trim().max(20000).default(""),
-  linkUrl: z.string().url().refine((value) => value.startsWith("https://"), "Use an HTTPS link").nullable().default(null)
+  linkUrl: z.string().url().refine((value) => value.startsWith("https://"), "Use an HTTPS link").nullable().default(null),
+  mediaId: uuidSchema.nullable().default(null)
+}).superRefine((value, context) => {
+  if (value.postType === "text" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Text posts require a body" });
+  if (value.postType === "link" && !value.linkUrl) context.addIssue({ code: z.ZodIssueCode.custom, path: ["linkUrl"], message: "Link posts require an HTTPS URL" });
+  if (value.postType === "image" && !value.mediaId) context.addIssue({ code: z.ZodIssueCode.custom, path: ["mediaId"], message: "Image posts require an uploaded image" });
+  if (value.postType !== "link" && value.linkUrl) context.addIssue({ code: z.ZodIssueCode.custom, path: ["linkUrl"], message: "Only link posts can include a link" });
+  if (value.postType !== "image" && value.mediaId) context.addIssue({ code: z.ZodIssueCode.custom, path: ["mediaId"], message: "Only image posts can include uploaded media" });
 });
 
 export const discussionCommentInputSchema = z.object({
@@ -236,5 +246,6 @@ export type DiscussionComment = {
   deletedAt: string | null;
   createdAt: string;
   viewerVote?: -1 | 0 | 1;
+  author?: { handle?: string; display_name?: string | null };
   children?: DiscussionComment[];
 };

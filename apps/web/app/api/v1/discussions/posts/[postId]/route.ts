@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const context = await requireDiscussions(request); if (context instanceof NextResponse) return context;
   const input = await parseJson(request, discussionPostUpdateSchema); if (input instanceof NextResponse) return input;
   const { postId } = await params;
-  const { data, error } = await context.supabase.rpc("update_discussion_post", { target_post: postId, submitted_title: input.title, submitted_body: input.body, submitted_link: input.linkUrl });
+  const { data, error } = await context.supabase.rpc("update_discussion_post", { target_post: postId, submitted_title: input.title, submitted_body: input.body, submitted_link: input.linkUrl, submitted_media: input.mediaId });
   return error ? discussionMutationError(request, error, "Unable to update this post.") : apiData(request, data);
 }
 export async function DELETE(request: Request, { params }: Params) {
