@@ -11,6 +11,7 @@ import {
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { DiscussionVote } from "./discussion-vote";
 import { DiscussionReport } from "./discussion-report";
+import { DiscussionCommentComposer } from "./discussion-comment-composer";
 
 export function CommentsClient({ postId, currentUser, initialCommentCount = 0, locked = false }: { postId: string; currentUser: string; initialCommentCount?: number; locked?: boolean }) {
   const [comments, setComments] = useState<DiscussionCommentNode[]>([]);
@@ -19,8 +20,10 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [composerExpanded, setComposerExpanded] = useState(false);
   const key = useRef(crypto.randomUUID());
   const loadSequence = useRef(0);
+  const pendingReveal = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -45,6 +48,18 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
   }, [initialCommentCount, postId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const commentId = pendingReveal.current;
+    if (!commentId) return;
+    const target = document.getElementById(`discussion-comment-${commentId}`);
+    if (!target) return;
+    pendingReveal.current = null;
+    target.scrollIntoView({
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "center",
+    });
+  }, [comments]);
 
   useEffect(() => {
     const client = createSupabaseBrowserClient();
@@ -84,6 +99,10 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
       key.current = crypto.randomUUID();
       formElement.reset();
       if (replyTo === parentCommentId) setReplyTo(null);
+      if (parentCommentId === null) {
+        pendingReveal.current = result.data.comment.id;
+        setComposerExpanded(false);
+      }
       setComments((current) => insertSubmittedComment(current, result.data.comment, result.data.parentReplyCount ?? undefined));
       setCommentCount((current) => result.data.postCommentCount ?? current + 1);
       setSubmitting(false);
@@ -104,7 +123,7 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
   }
 
   function render(nodes: DiscussionCommentNode[]): React.ReactNode {
-    return nodes.map((comment) => <article className="discussion-comment" style={{ "--comment-depth": Math.min(comment.depth, 4) } as React.CSSProperties} key={comment.id}>
+    return nodes.map((comment) => <article className="discussion-comment" id={`discussion-comment-${comment.id}`} style={{ "--comment-depth": Math.min(comment.depth, 4) } as React.CSSProperties} key={comment.id}>
       <div className="comment-line"/>
       <DiscussionVote targetType="comments" targetId={comment.id} initialScore={comment.score} initialVote={comment.viewerVote ?? 0}/>
       <div className="comment-copy">
@@ -123,9 +142,15 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
 
   return <section className="discussion-comments">
     <div className="section-heading"><div><span className="overline">CONVERSATION</span><h2>{commentCount} {commentCount === 1 ? "comment" : "comments"}</h2></div><MessageCircle/></div>
-    {!locked && <form className="comment-composer" onSubmit={(event) => void submit(event, null)}><textarea name="body" maxLength={10000} placeholder="Add to the discussion…" required/><button className="button button-primary" disabled={submitting}>{submitting ? "Posting…" : "Comment"}</button></form>}
     {locked && <p className="discussion-notice">This post is locked. Existing comments remain visible.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}
     {loading ? <div className="center-state"><LoaderCircle className="spin"/>Loading comments…</div> : comments.length ? render(comments) : <div className="empty-state compact"><MessageCircle/><h2>No comments yet</h2><p>Start a thoughtful conversation.</p></div>}
+    {!locked && <DiscussionCommentComposer
+      expanded={composerExpanded}
+      submitting={submitting}
+      onExpand={() => setComposerExpanded(true)}
+      onCancel={() => setComposerExpanded(false)}
+      onSubmit={(event) => void submit(event, null)}
+    />}
   </section>;
 }

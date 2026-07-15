@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSidebarCollapsed, SIDEBAR_PREFERENCE_KEY } from "@/lib/navigation";
 import { AppNavigation } from "./app-navigation";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
   const db = await createSupabaseServerClient();
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/sign-in");
@@ -31,6 +34,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         notificationCount={notificationCount ?? 0}
         messageCount={messageCount}
         discussionsEnabled={discussionsEnabled === true}
+        initialSidebarCollapsed={isSidebarCollapsed(cookieStore.get(SIDEBAR_PREFERENCE_KEY)?.value)}
       />
       <div className="app-main">{children}</div>
     </div>
