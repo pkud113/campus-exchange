@@ -14,13 +14,19 @@ export async function POST(request: Request) {
   try {
     const admin = createSupabaseAdminClient();
     const domain = normalizeSchoolDomain(input.email);
-    const { data: campus } = await admin.from("campus_email_domains").select("campus_id").eq("domain", domain).maybeSingle();
+    const { data: campus } = await admin
+      .from("campus_email_domains")
+      .select("campus_id,campuses!inner(status)")
+      .eq("domain", domain)
+      .eq("is_enabled", true)
+      .eq("campuses.status", "enabled")
+      .maybeSingle();
     const emailHash = await sha256(input.email);
     const { data: staffInvite } = await admin.from("staff_invitations").select("id,claimed_at").eq("email_hash", emailHash).gt("expires_at",new Date().toISOString()).maybeSingle();
     if (!campus && !staffInvite) return apiError(request, 403, "forbidden", "That email is not eligible for Campus Exchange.");
     const { error } = await admin.auth.signInWithOtp({
       email: input.email,
-      options: { shouldCreateUser: Boolean(campus), emailRedirectTo: `${process.env.APP_ORIGIN ?? new URL(request.url).origin}/auth/callback` }
+      options: { shouldCreateUser: Boolean(campus || staffInvite), emailRedirectTo: `${process.env.APP_ORIGIN ?? new URL(request.url).origin}/auth/callback` }
     });
     if (error?.code === "over_email_send_rate_limit" || error?.code === "over_request_rate_limit") return apiError(request, 429, "rate_limited", "Too many verification emails were requested. Wait briefly and retry.");
     if (error) {

@@ -74,14 +74,15 @@ describe("account foundation", () => {
     expect(canRespondToConversationRequest("pending", false)).toBe(false);
   });
   it("purges soft-deleted content after thirty days", () => expect(purgeAt(new Date("2026-01-01T00:00:00Z")).toISOString()).toBe("2026-01-31T00:00:00.000Z"));
-  it("rejects self, blocked, duplicate, and cross-campus direct requests", () => {
-    const valid={requesterId:"a",recipientId:"b",sameCampus:true,blocked:false,pendingExists:false,conversationExists:false};
+  it("rejects self, blocked, and duplicate requests while honoring the network switch", () => {
+    const valid={requesterId:"a",recipientId:"b",sameCampus:true,networkEnabled:true,blocked:false,pendingExists:false,conversationExists:false};
     expect(canCreateDirectConversationRequest(valid)).toBe(true);
     expect(canCreateDirectConversationRequest({...valid,recipientId:"a"})).toBe(false);
     expect(canCreateDirectConversationRequest({...valid,blocked:true})).toBe(false);
     expect(canCreateDirectConversationRequest({...valid,pendingExists:true})).toBe(false);
     expect(canCreateDirectConversationRequest({...valid,conversationExists:true})).toBe(false);
-    expect(canCreateDirectConversationRequest({...valid,sameCampus:false})).toBe(false);
+    expect(canCreateDirectConversationRequest({...valid,sameCampus:false})).toBe(true);
+    expect(canCreateDirectConversationRequest({...valid,sameCampus:false,networkEnabled:false})).toBe(false);
   });
   it("requires MFA when staff manage another member's content",()=>{
     expect(canManageOwnedContent("owner","owner",false,false)).toBe(true);

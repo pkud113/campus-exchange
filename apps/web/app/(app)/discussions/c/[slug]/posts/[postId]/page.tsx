@@ -51,7 +51,7 @@ export default async function DiscussionPostPage({ params }: { params: Promise<{
           <span className="community-mini-icon">{community.icon_media_id ? <img src={`/api/v1/media/${community.icon_media_id}?variant=thumb`} alt=""/> : community.display_name.slice(0, 1)}</span>
           <span><strong>{community.display_name}</strong><small>c/{community.slug}</small></span>
         </Link>
-        <p>{community.description || "A private MSU campus community."}</p>
+        <p>{community.description || "A private community for this campus."}</p>
         <div className="community-stats"><span><Users/>{community.member_count} members</span><span>{community.post_count} posts</span></div>
       </section>
       <section className="community-list-card"><h2>Community rules</h2><div className="community-rules">{community.rules || "Be respectful and keep conversations useful to the campus community."}</div></section>

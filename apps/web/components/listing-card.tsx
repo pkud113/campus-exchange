@@ -9,6 +9,8 @@ type Seller = {
   display_name?: string | null;
   handle?: string | null;
   avatar_media_id?: string | null;
+  campus_name?: string | null;
+  campus_short_name?: string | null;
 };
 
 export type ListingCardItem = {
@@ -19,6 +21,10 @@ export type ListingCardItem = {
   price_cents: number;
   currency: string;
   created_at?: string;
+  visibility?: "campus_only" | "network";
+  exchange_methods?: string[] | null;
+  legacy_exchange_unspecified?: boolean;
+  campuses?: { name?: string; short_name?: string } | Array<{ name?: string; short_name?: string }> | null;
   profiles?: Seller | Seller[] | null;
   tone?: string;
   media_uploads?: Array<{ id: string; alt_text?: string; status?: string }>;
@@ -49,6 +55,8 @@ export function ListingCard({
   const media = listing.media_uploads?.find((item) => item.status === "ready");
   const seller = sellerFrom(listing.profiles);
   const sellerName = seller.display_name ?? seller.handle ?? "Verified student";
+  const listingCampus = Array.isArray(listing.campuses) ? listing.campuses[0] : listing.campuses;
+  const campusName = seller.campus_short_name ?? listingCampus?.short_name ?? seller.campus_name ?? listingCampus?.name ?? "Campus";
 
   async function toggle() {
     if (busy) return;
@@ -81,11 +89,12 @@ export function ListingCard({
         <div className="listing-details">
           <strong className="listing-price">{displayPrice(listing.price_cents, listing.currency)}</strong>
           <h3>{listing.title}</h3>
+          <div className="content-badges"><span className="content-badge"><MapPin /> {campusName}</span>{listing.visibility === "network" && <span className="content-badge">Campus network</span>}</div>
           <div className="listing-seller">
             <UserAvatar name={sellerName} mediaId={seller.avatar_media_id ?? null} size="small" />
             <span>
               <strong>{sellerName}</strong>
-              <small><MapPin /> On campus</small>
+              <small>{listing.legacy_exchange_unspecified ? "Exchange details not specified" : "Exchange methods listed"}</small>
             </span>
           </div>
         </div>

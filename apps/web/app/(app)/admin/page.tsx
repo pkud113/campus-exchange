@@ -13,11 +13,11 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     data: { user },
   } = await db.auth.getUser();
   if (!user) redirect("/sign-in?next=/admin");
-  const { data: roles } = await db
-    .from("role_assignments")
-    .select("role")
-    .eq("profile_id", user.id);
-  if (!roles?.some(({ role }) => role === "moderator" || role === "admin"))
+  const [{ data: roles }, { data: platformRoles }] = await Promise.all([
+    db.from("role_assignments").select("role").eq("profile_id", user.id),
+    db.from("platform_role_assignments").select("role").eq("profile_id", user.id),
+  ]);
+  if (!roles?.some(({ role }) => role === "moderator" || role === "admin") && !platformRoles?.length)
     notFound();
   const { data: aal } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.currentLevel !== "aal2") redirect("/settings?mfa=required");

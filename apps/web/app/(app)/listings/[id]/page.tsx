@@ -15,11 +15,11 @@ export default async function ListingDetail({ params }: Props) {
     data: { user },
   } = await db.auth.getUser();
   if (!user) redirect(`/sign-in?next=${encodeURIComponent(`/listings/${id}`)}`);
-  const [{ data: item }, { count: favoriteCount }] = await Promise.all([
+  const [{ data: item }, { count: favoriteCount }, { data: safeMedia }] = await Promise.all([
     db
       .from("listings")
       .select(
-        "id,title,description,category,condition,price_cents,currency,status,seller_id,profiles!listings_seller_id_fkey(handle,display_name,avatar_media_id),media_uploads(id,alt_text,status)",
+        "id,title,description,category,condition,price_cents,currency,status,seller_id,visibility,exchange_methods,legacy_exchange_unspecified,campuses!inner(name,short_name,slug)",
       )
       .eq("id", id)
       .single(),
@@ -28,13 +28,17 @@ export default async function ListingDetail({ params }: Props) {
       .select("listing_id", { count: "exact", head: true })
       .eq("profile_id", user.id)
       .eq("listing_id", id),
+    db.rpc("safe_listing_media", { target_ids: [id] }),
   ]);
   if (!item) notFound();
-  const seller = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
-  const media = (item.media_uploads ?? []).filter(
+  const { data: sellerRows } = await db.rpc("safe_profile_cards", { target_ids: [item.seller_id] });
+  const seller = sellerRows?.[0];
+  const media = (safeMedia ?? []).filter(
     (entry: { status: string }) => entry.status === "ready",
   );
   const sellerName = seller?.display_name ?? seller?.handle ?? "Verified student";
+  const campus = Array.isArray(item.campuses) ? item.campuses[0] : item.campuses;
+  const exchangeLabels: Record<string,string> = { campus_pickup:"Campus pickup", in_person_meetup:"In-person meetup", shipping:"Shipping", digital_delivery:"Digital delivery" };
   return (
     <main className="dashboard narrow">
       <Link className="back-link" href="/marketplace">
@@ -44,6 +48,7 @@ export default async function ListingDetail({ params }: Props) {
         <ListingGallery media={media} title={item.title} category={item.category} />
         <section className="detail-copy">
           <span className="condition-pill">{item.condition.replaceAll("_", " ")}</span>
+          <div className="content-badges"><span className="content-badge"><MapPin /> {campus?.name ?? "Campus"}</span>{item.visibility === "network" && <span className="content-badge">Campus network</span>}</div>
           <h1>{item.title}</h1>
           <strong className="detail-price">
             {new Intl.NumberFormat("en-US", {
@@ -61,15 +66,19 @@ export default async function ListingDetail({ params }: Props) {
                 <ShieldCheck /> Verified student
               </span>
               <small>
-                <MapPin /> Michigan State University
+                <MapPin /> {campus?.name ?? "Campus member"}
               </small>
             </div>
           </Link>
           <ListingActions
             listingId={item.id}
+            sellerId={item.seller_id}
+            sellerUsername={seller?.handle ?? "member"}
+            sellerCampus={campus?.name ?? "Campus Exchange"}
             isSeller={item.seller_id === user.id}
             initialFavorite={(favoriteCount ?? 0) > 0}
           />
+          <div className="safe-inline"><MapPin /><p><strong>Exchange:</strong> {item.legacy_exchange_unspecified ? "Exchange details not specified." : (item.exchange_methods ?? []).map((method:string)=>exchangeLabels[method] ?? method).join(", ")}</p></div>
           <div className="safe-inline">
             <ShieldCheck />
             <p>Meet in a public campus location and inspect the item before paying.</p>

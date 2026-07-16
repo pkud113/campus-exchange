@@ -5,10 +5,10 @@ describe("buildMarketplaceHref", () => {
   it("preserves compatible filters and resets the cursor when requested", () => {
     expect(
       buildMarketplaceHref(
-        { q: "desk", category: "furniture", sort: "price_asc", cursor: "old" },
+        { q: "desk", category: "furniture", sort: "price_asc", campus: "all", cursor: "old" },
         { category: "books", cursor: null },
       ),
-    ).toBe("/marketplace?q=desk&category=books&sort=price_asc");
+    ).toBe("/marketplace?q=desk&category=books&sort=price_asc&campus=all");
   });
 
   it("omits empty and default values", () => {

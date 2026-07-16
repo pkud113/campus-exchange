@@ -23,18 +23,19 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
   const filters = await searchParams;
   const { listings, nextCursor } = await loadMarketplacePage(filters);
   const db = await createSupabaseServerClient();
-  const { data: favorites } = listings.length
-    ? await db.from("favorites").select("listing_id").in("listing_id", listings.map((item) => item.id))
-    : { data: [] };
+  const [{ data: favorites }, { data: campuses }] = await Promise.all([
+    listings.length ? db.from("favorites").select("listing_id").in("listing_id", listings.map((item) => item.id)) : Promise.resolve({ data: [] }),
+    db.from("campuses").select("name,short_name,slug").eq("status", "enabled").order("name"),
+  ]);
   const favoriteIds = new Set((favorites ?? []).map((item) => item.listing_id));
-  const filtered = Boolean(filters.q || filters.category || (filters.sort && filters.sort !== "newest"));
+  const filtered = Boolean(filters.q || filters.category || (filters.sort && filters.sort !== "newest") || (filters.campus && filters.campus !== "my"));
 
   return (
     <main className="dashboard marketplace-page">
       <PageHeader
         eyebrow="CAMPUS MARKETPLACE"
         title="Find what you need."
-        description="Browse listings shared by verified members of your campus."
+        description="Browse campus listings or intentionally network-visible listings from other enabled campuses."
         actions={<Link className="button button-primary" href="/sell"><Plus /> Create listing</Link>}
       />
 
@@ -43,6 +44,7 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
         <input name="q" defaultValue={filters.q} aria-label="Search marketplace" placeholder="Search desks, textbooks, bikes…" />
         {filters.category && <input type="hidden" name="category" value={filters.category} />}
         {filters.sort && <input type="hidden" name="sort" value={filters.sort} />}
+        {filters.campus && <input type="hidden" name="campus" value={filters.campus} />}
         <button type="submit">Search</button>
       </form>
 
@@ -79,6 +81,13 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
           <form action="/marketplace" className="marketplace-sort">
             {filters.q && <input type="hidden" name="q" value={filters.q} />}
             {filters.category && <input type="hidden" name="category" value={filters.category} />}
+            <label>Campus
+              <select name="campus" defaultValue={filters.campus ?? "my"}>
+                <option value="my">My campus</option>
+                <option value="all">All campuses</option>
+                {(campuses ?? []).map((campus: any) => <option key={campus.slug} value={campus.slug}>{campus.short_name ?? campus.name}</option>)}
+              </select>
+            </label>
             <label>Sort listings
               <select name="sort" defaultValue={filters.sort ?? "newest"}>
                 <option value="newest">Newest first</option>
@@ -95,7 +104,7 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
           <SectionHeader
             eyebrow={filtered ? "SEARCH RESULTS" : "JUST LISTED"}
             title={filtered ? `${listings.length}${nextCursor ? "+" : ""} matches` : "Fresh around campus"}
-            description={filtered ? "Results from verified members of your campus." : "New listings appear here as students post them."}
+            description={filtered ? "Results honor each listing’s campus or network visibility." : "New campus listings appear here as students post them."}
             action={filtered ? <Link href="/marketplace">Clear filters</Link> : undefined}
           />
           {listings.length ? (

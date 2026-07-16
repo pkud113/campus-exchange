@@ -2,17 +2,17 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(45);
 
-insert into public.campuses(id,name,slug,timezone) values
-  ('00000000-0000-4000-8000-000000000002','Other University','other-university','America/Chicago') on conflict do nothing;
-insert into public.campus_email_domains(campus_id,domain) values
-  ('00000000-0000-4000-8000-000000000002','students.other.edu') on conflict do nothing;
+insert into public.campuses(id,name,short_name,slug,timezone,status) values
+  ('00000000-0000-4000-8000-000000000002','Campus Beta','Beta','campus-beta','America/Chicago','enabled') on conflict do nothing;
+insert into public.campus_email_domains(campus_id,domain,is_enabled) values
+  ('00000000-0000-4000-8000-000000000002','students.beta.invalid',true) on conflict do nothing;
 
 insert into auth.users(id,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,aud,role) values
-  ('10000000-0000-4000-8000-000000000001','owner@students.demo.edu','test',now(),'{}','{}','authenticated','authenticated'),
-  ('10000000-0000-4000-8000-000000000002','member@students.demo.edu','test',now(),'{}','{}','authenticated','authenticated'),
-  ('10000000-0000-4000-8000-000000000003','suspended@students.demo.edu','test',now(),'{}','{}','authenticated','authenticated'),
-  ('10000000-0000-4000-8000-000000000004','outsider@students.other.edu','test',now(),'{}','{}','authenticated','authenticated'),
-  ('10000000-0000-4000-8000-000000000005','staff@students.demo.edu','test',now(),'{}','{}','authenticated','authenticated');
+  ('10000000-0000-4000-8000-000000000001','owner@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated'),
+  ('10000000-0000-4000-8000-000000000002','member@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated'),
+  ('10000000-0000-4000-8000-000000000003','suspended@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated'),
+  ('10000000-0000-4000-8000-000000000004','outsider@students.beta.invalid','test',now(),'{}','{}','authenticated','authenticated'),
+  ('10000000-0000-4000-8000-000000000005','staff@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated');
 update public.profiles set status='active', onboarding_completed_at=now(), password_setup_required=false,
   verified_at=now(), verified_until=now()+interval '1 year', handle=case id
     when '10000000-0000-4000-8000-000000000001' then 'discussion_owner'

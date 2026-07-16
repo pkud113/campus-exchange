@@ -1,2 +1,11 @@
-import{apiData,apiError,requireVerified}from"@/lib/api";import{NextResponse}from"next/server";type Params={params:Promise<{username:string}>};
-export async function GET(request:Request,{params}:Params){const c=await requireVerified(request);if(c instanceof NextResponse)return c;const{username}=await params;const{data,error}=await c.supabase.from("profiles").select("id,handle,display_name,bio,avatar_media_id,banner_media_id,created_at,campuses(name)").eq("campus_id",c.campusId).eq("handle",username.toLowerCase()).eq("status","active").single();return error?apiError(request,404,"not_found","Profile not found."):apiData(request,data)}
+import { apiData, apiError, requireVerified } from "@/lib/api";
+import { NextResponse } from "next/server";
+type Params = { params: Promise<{ username: string }> };
+export async function GET(request: Request, { params }: Params) {
+  const context = await requireVerified(request);
+  if (context instanceof NextResponse) return context;
+  const { username } = await params;
+  const { data, error } = await context.supabase.rpc("safe_profile_by_username", { target_username: username.toLowerCase() });
+  const profile = data?.[0];
+  return error || !profile ? apiError(request, 404, "not_found", "Profile not found.") : apiData(request, profile);
+}

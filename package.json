@@ -11,6 +11,7 @@
     "db:reset": "supabase db reset",
     "db:start": "supabase start",
     "admin:invite": "pnpm --filter @campus-exchange/web admin:invite",
+    "campus:admin": "pnpm --filter @campus-exchange/web campus:admin",
     "auth:v2": "pnpm --filter @campus-exchange/web auth:v2"
   },
   "devDependencies": {

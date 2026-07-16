@@ -1,5 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { apiError, requireVerified } from "@/lib/api";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import {
   transformImageForDelivery,
@@ -22,12 +23,14 @@ export async function GET(request: Request, { params }: Params) {
   const context = await requireVerified(request);
   if (context instanceof NextResponse) return context;
   const { id } = await params;
-  const { data } = await context.supabase
+  const { data: allowed } = await context.supabase.rpc("can_read_media", { target_media: id });
+  if (allowed !== true) return apiError(request, 404, "not_found", "Media not found.");
+  const { data } = await createSupabaseAdminClient()
     .from("media_uploads")
     .select("object_key,status,campus_id,content_type")
     .eq("id", id)
     .single();
-  if (!data || data.status !== "ready" || data.campus_id !== context.campusId) {
+  if (!data || data.status !== "ready") {
     return apiError(request, 404, "not_found", "Media not found.");
   }
 

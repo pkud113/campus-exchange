@@ -15,7 +15,7 @@ export default async function EditListing({
   const { data } = await db
     .from("listings")
     .select(
-      "id,seller_id,title,description,category,condition,price_cents,currency,deleted_at,media_uploads(id,alt_text,status)",
+      "id,seller_id,title,description,category,condition,price_cents,currency,visibility,exchange_methods,legacy_exchange_unspecified,deleted_at,media_uploads(id,alt_text,status)",
     )
     .eq("id", id)
     .single();

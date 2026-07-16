@@ -19,6 +19,7 @@ import {
   ShoppingBag,
   Store,
   UserRound,
+  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -218,6 +219,7 @@ export function AppNavigation({
   const marketplaceEntry: NavEntry = { href: "/marketplace", label: "Marketplace", Icon: Store };
   const discussionsEntry: NavEntry = { href: "/discussions", label: "Discussions", Icon: MessageSquareText };
   const eventsEntry: NavEntry = { href: "/events", label: "Events", Icon: CalendarDays };
+  const peopleEntry: NavEntry = { href: "/people", label: "People", Icon: UsersRound };
   const messagesEntry: NavEntry = { href: "/messages", label: "Messages", Icon: MessageCircle, count: messageCount };
   const notificationsEntry: NavEntry = { href: "/notifications", label: "Notifications", Icon: Bell, count: notificationCount };
   const main: NavEntry[] = [
@@ -225,6 +227,7 @@ export function AppNavigation({
     marketplaceEntry,
     ...(discussionsEnabled ? [discussionsEntry] : []),
     eventsEntry,
+    peopleEntry,
     messagesEntry,
     notificationsEntry,
   ];
@@ -394,7 +397,7 @@ export function AppNavigation({
               <ChevronRight aria-hidden="true" />
             </Link>
             <nav aria-label="More destinations">
-              <NavSection label="Updates" entries={[notificationsEntry]} path={path} onNavigate={closeMenu} />
+              <NavSection label="Discover" entries={[peopleEntry, notificationsEntry]} path={path} onNavigate={closeMenu} />
               <NavSection label="Management" entries={management} path={path} onNavigate={closeMenu} />
               <NavSection label="Account" entries={account} path={path} onNavigate={closeMenu} />
             </nav>

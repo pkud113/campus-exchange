@@ -1,7 +1,21 @@
 import { createSupabaseServerClient } from "./supabase/server";
 
 const listingSelect =
-  "id,title,description,category,condition,price_cents,currency,status,created_at,profiles!listings_seller_id_fkey(handle,display_name,avatar_media_id),media_uploads(id,alt_text,status)";
+  "id,campus_id,seller_id,title,description,category,condition,price_cents,currency,status,visibility,exchange_methods,legacy_exchange_unspecified,created_at,campuses!inner(name,short_name,slug)";
+
+async function enrichListings(db: Awaited<ReturnType<typeof createSupabaseServerClient>>, rows: any[]) {
+  if (!rows.length) return rows;
+  const [{ data: profiles }, { data: media }] = await Promise.all([
+    db.rpc("safe_profile_cards", { target_ids: [...new Set(rows.map((row) => row.seller_id))] }),
+    db.rpc("safe_listing_media", { target_ids: rows.map((row) => row.id) }),
+  ]);
+  const profileMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
+  return rows.map((row) => ({
+    ...row,
+    profiles: profileMap.get(row.seller_id) ?? null,
+    media_uploads: (media ?? []).filter((item: any) => item.listing_id === row.id),
+  }));
+}
 
 export async function loadListings(filters?: {
   q?: string;
@@ -19,13 +33,15 @@ export async function loadListings(filters?: {
       .eq("status", "active")
       .is("deleted_at", null)
       .limit(filters?.limit ?? 24);
+    const { data: profile } = await db.from("profiles").select("campus_id").eq("id", user.id).single();
+    if (profile?.campus_id) query = query.eq("campus_id", profile.campus_id);
     if (filters?.q) query = query.textSearch("search_vector", filters.q, { type: "websearch", config: "english" });
     if (filters?.category) query = query.eq("category", filters.category);
     if (filters?.sort === "price_asc") query = query.order("price_cents", { ascending: true }).order("id", { ascending: true });
     else if (filters?.sort === "price_desc") query = query.order("price_cents", { ascending: false }).order("id", { ascending: false });
     else query = query.order("created_at", { ascending: false }).order("id", { ascending: false });
     const { data, error } = await query;
-    return error ? [] : data ?? [];
+    return error ? [] : enrichListings(db, data ?? []);
   } catch {
     return [];
   }
@@ -46,7 +62,7 @@ function decodeMarketplaceCursor(value?: string): MarketplaceCursor | null {
   }
 }
 
-export async function loadMarketplacePage(filters?: { q?: string; category?: string; sort?: string; cursor?: string }) {
+export async function loadMarketplacePage(filters?: { q?: string; category?: string; sort?: string; campus?: string; cursor?: string }) {
   try {
     const db = await createSupabaseServerClient();
     const { data: { user } } = await db.auth.getUser();
@@ -59,6 +75,10 @@ export async function loadMarketplacePage(filters?: { q?: string; category?: str
       .eq("status", "active")
       .is("deleted_at", null)
       .limit(25);
+    if (!filters?.campus || filters.campus === "my") {
+      const { data: profile } = await db.from("profiles").select("campus_id").eq("id", user.id).single();
+      if (profile?.campus_id) query = query.eq("campus_id", profile.campus_id);
+    } else if (filters.campus !== "all") query = query.eq("campuses.slug", filters.campus);
     if (filters?.q) query = query.textSearch("search_vector", filters.q, { type: "websearch", config: "english" });
     if (filters?.category) query = query.eq("category", filters.category);
     if (sort === "price_asc") query = query.order("price_cents", { ascending: true }).order("id", { ascending: true });
@@ -72,7 +92,7 @@ export async function loadMarketplacePage(filters?: { q?: string; category?: str
     const { data, error } = await query;
     if (error) return { listings: [], nextCursor: null };
     const rows = data ?? [];
-    const listings = rows.slice(0, 24);
+    const listings = await enrichListings(db, rows.slice(0, 24));
     const last = listings.at(-1);
     const nextCursor = rows.length > 24 && last
       ? Buffer.from(JSON.stringify({ sort, value: sort === "newest" ? last.created_at : String(last.price_cents), id: last.id } satisfies MarketplaceCursor), "utf8").toString("base64url")
@@ -83,20 +103,32 @@ export async function loadMarketplacePage(filters?: { q?: string; category?: str
   }
 }
 
-export async function loadEvents() {
+export async function loadEvents(filters?: { campus?: string }) {
   try {
     const db = await createSupabaseServerClient();
     const { data: { user } } = await db.auth.getUser();
     if (!user) return [];
-    const { data, error } = await db
+    let query = db
       .from("events")
-      .select("id,title,description,location,starts_at,ends_at,capacity,event_rsvps(count)")
+      .select("id,campus_id,organizer_id,title,description,location,starts_at,ends_at,capacity,visibility,campuses!inner(name,short_name,slug)")
       .is("cancelled_at", null)
       .is("deleted_at", null)
       .gte("starts_at", new Date().toISOString())
       .order("starts_at")
       .limit(12);
-    return error ? [] : data ?? [];
+    if (!filters?.campus || filters.campus === "my") {
+      const { data: profile } = await db.from("profiles").select("campus_id").eq("id", user.id).single();
+      if (profile?.campus_id) query = query.eq("campus_id", profile.campus_id);
+    } else if (filters.campus !== "all") query = query.eq("campuses.slug", filters.campus);
+    const { data, error } = await query;
+    if (error || !data) return [];
+    const [{ data: profiles }, { data: counts }] = await Promise.all([
+      db.rpc("safe_profile_cards", { target_ids: [...new Set(data.map((row) => row.organizer_id))] }),
+      db.rpc("event_rsvp_counts", { target_ids: data.map((row) => row.id) }),
+    ]);
+    const profileMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
+    const countMap = new Map<string, number>((counts ?? []).map((row: any) => [String(row.event_id), Number(row.attendee_count)]));
+    return data.map((row) => ({ ...row, organizer: profileMap.get(row.organizer_id) ?? null, attendee_count: countMap.get(row.id) ?? 0 }));
   } catch {
     return [];
   }

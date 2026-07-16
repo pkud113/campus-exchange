@@ -37,8 +37,8 @@ export function canRespondToConversationRequest(status: string, isRecipient: boo
   return status === "pending" && isRecipient;
 }
 
-export function canCreateDirectConversationRequest(input: { requesterId: string; recipientId: string; sameCampus: boolean; blocked: boolean; pendingExists: boolean; conversationExists: boolean }): boolean {
-  return input.requesterId !== input.recipientId && input.sameCampus && !input.blocked && !input.pendingExists && !input.conversationExists;
+export function canCreateDirectConversationRequest(input: { requesterId: string; recipientId: string; sameCampus: boolean; networkEnabled: boolean; blocked: boolean; pendingExists: boolean; conversationExists: boolean }): boolean {
+  return input.requesterId !== input.recipientId && (input.sameCampus || input.networkEnabled) && !input.blocked && !input.pendingExists && !input.conversationExists;
 }
 
 export function canManageOwnedContent(actorId: string, ownerId: string, isStaff: boolean, hasMfa: boolean): boolean {

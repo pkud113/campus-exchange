@@ -80,11 +80,34 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+      - name: Validate linked database release
+        if: ${{ env.WEB_ONLY != 'true' }}
+        shell: bash
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase migration list --linked
+          supabase db push --linked --include-all --dry-run
+          supabase db advisors --linked --type all --level warn --fail-on error
+
+      - name: Ensure private media bucket exists
+        if: ${{ env.WEB_ONLY != 'true' }}
+        shell: bash
+        run: |
+          if ! pnpm --dir apps/worker exec wrangler r2 bucket list | grep -q 'campus-exchange-media'; then
+            pnpm --dir apps/worker exec wrangler r2 bucket create campus-exchange-media
+          fi
+
+      # The forward-compatible worker must understand every new outbox event before
+      # the database migration can begin emitting those event types.
+      - name: Deploy forward-compatible background worker
+        if: ${{ env.WEB_ONLY != 'true' }}
+        run: pnpm --filter @campus-exchange/worker run deploy
+
       - name: Apply production database migrations
         if: ${{ env.WEB_ONLY != 'true' }}
         run: |
-          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
-          supabase db push --include-all
+          supabase db push --linked --include-all
+          supabase db advisors --linked --type all --level warn --fail-on error
 
       - name: Configure Supabase Auth email delivery
         if: ${{ env.WEB_ONLY != 'true' }}
@@ -135,14 +158,6 @@ jobs:
                 and .mailer_subjects_recovery == "Your Campus Exchange recovery code"
                 and .password_min_length == 12' >/dev/null
 
-      - name: Ensure private media bucket exists
-        if: ${{ env.WEB_ONLY != 'true' }}
-        shell: bash
-        run: |
-          if ! pnpm --dir apps/worker exec wrangler r2 bucket list | grep -q 'campus-exchange-media'; then
-            pnpm --dir apps/worker exec wrangler r2 bucket create campus-exchange-media
-          fi
-
       - name: Deploy web application
         run: pnpm --filter @campus-exchange/web run deploy
 
@@ -155,10 +170,6 @@ jobs:
           printf '%s' "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" | pnpm --dir apps/worker exec wrangler secret put NEXT_PUBLIC_TURNSTILE_SITE_KEY --name campus-exchange-web
           printf '%s' "$TURNSTILE_SECRET_KEY" | pnpm --dir apps/worker exec wrangler secret put TURNSTILE_SECRET_KEY --name campus-exchange-web
           printf '%s' "$APP_ORIGIN" | pnpm --dir apps/worker exec wrangler secret put APP_ORIGIN --name campus-exchange-web
-
-      - name: Deploy background worker
-        if: ${{ env.WEB_ONLY != 'true' }}
-        run: pnpm --filter @campus-exchange/worker run deploy
 
       - name: Configure worker runtime secrets
         if: ${{ env.WEB_ONLY != 'true' }}

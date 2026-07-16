@@ -1,6 +1,10 @@
 # Campus Exchange
 
-Campus Exchange is an MSU-only marketplace, events, messaging, and campus-discussions PWA. It is a TypeScript modular monolith built with Next.js, Cloudflare Workers/R2/Images, Supabase PostgreSQL/Auth/Realtime, and a scheduled outbox worker.
+Campus Exchange is a verified multi-campus marketplace, events, messaging, and campus-discussions PWA. It is a TypeScript modular monolith built with Next.js, Cloudflare Workers/R2/Images, Supabase PostgreSQL/Auth/Realtime, and a scheduled outbox worker.
+
+Campuses and exact email domains are operator managed. Existing campuses retain their pre-migration behavior, while every newly created campus and domain starts inactive; no real university is activated by a seed migration. Listings and events default to campus-only and may be explicitly shared to the network. Discussions remain strictly campus-private.
+
+Cross-campus identity uses narrow database projections rather than global profile-table access. Direct, listing, and event contact begins with an idempotent 10–500 character request. Acceptance transactionally creates or recovers the conversation and stores the opening as its first normal message. Blocks are global, prevent contact and new messages, and preserve conversation history as read-only by default.
 
 The Discussions release adds campus-private Reddit-style communities, role-based ownership/moderation, text/link/private-image posts, eight-level threaded comments, transactional votes and saves, PostgreSQL search/ranking, report snapshots, generic outbox notifications, and 30-day structural tombstones. It remains isolated by the existing verified campus identity and staff AAL2 controls.
 
@@ -17,6 +21,14 @@ The landing page works without credentials. Authenticated features require all m
 ## Verification
 
 Run `supabase db reset`, `supabase db lint --local --level error --fail-on error`, `supabase test db --local supabase/tests`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. The worker build is a Wrangler dry run and the web build is the production Next.js/OpenNext build.
+
+Database tests use synthetic Campus Alpha, Campus Beta, and an inactive campus. They do not activate additional production universities.
+
+## Campus operations
+
+`pnpm campus:admin -- list` reads the safe operational state. Mutating commands preview by default and require `--apply`; supported operations create/update inactive campuses, manage exact domains, explicitly change campus lifecycle state, change approved network safety settings, and grant/revoke platform moderation roles. See [the production runbook](docs/operations.md) for examples, activation readback, feature disable, and rollback.
+
+The [multi-campus design contract](docs/multi-campus.md) explicitly separates verified repository facts, implementation decisions, recommended defaults, assumptions, and local execution-environment observations.
 
 ## Discussions architecture
 

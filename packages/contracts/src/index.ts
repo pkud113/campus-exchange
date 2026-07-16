@@ -19,6 +19,9 @@ export const listingStatusSchema = z.enum(["draft", "active", "reserved", "sold"
 export type ListingStatus = z.infer<typeof listingStatusSchema>;
 
 export const listingCategorySchema = z.enum(["books", "electronics", "furniture", "clothing", "housing", "transport", "other"]);
+export const contentVisibilitySchema = z.enum(["campus_only", "network"]);
+export const listingExchangeMethodSchema = z.enum(["campus_pickup", "in_person_meetup", "shipping", "digital_delivery"]);
+export const campusSelectorSchema = z.string().trim().toLowerCase().max(80).regex(/^(my|all|[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/).default("my");
 export const listingInputSchema = z.object({
   title: z.string().trim().min(3).max(100),
   description: z.string().trim().min(10).max(5000),
@@ -26,6 +29,8 @@ export const listingInputSchema = z.object({
   priceCents: z.number().int().min(0).max(10_000_000),
   currency: z.string().length(3).transform((value) => value.toUpperCase()).default("USD"),
   condition: z.enum(["new", "like_new", "good", "fair", "poor"]),
+  visibility: contentVisibilitySchema.default("campus_only"),
+  exchangeMethods: z.array(listingExchangeMethodSchema).min(1).max(4).refine((items) => new Set(items).size === items.length, { message: "Exchange methods must be unique" }),
   idempotencyKey: z.string().uuid()
 });
 
@@ -47,6 +52,7 @@ export const eventInputSchema = z.object({
   startsAt: utcDateSchema,
   endsAt: utcDateSchema,
   capacity: z.number().int().positive().max(10_000).nullable().default(null),
+  visibility: contentVisibilitySchema.default("campus_only"),
   idempotencyKey: z.string().uuid()
 }).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), { message: "Event must end after it starts", path: ["endsAt"] });
 
@@ -56,7 +62,8 @@ export const eventUpdateSchema = z.object({
   location: z.string().trim().min(2).max(200).optional(),
   startsAt: utcDateSchema.optional(),
   endsAt: utcDateSchema.optional(),
-  capacity: z.number().int().positive().max(10_000).nullable().optional()
+  capacity: z.number().int().positive().max(10_000).nullable().optional(),
+  visibility: contentVisibilitySchema.optional()
 }).refine((value) => Object.keys(value).length > 0, { message: "Provide at least one event field to update" });
 
 export const messageInputSchema = z.object({
@@ -65,7 +72,7 @@ export const messageInputSchema = z.object({
 });
 
 export const reportInputSchema = z.object({
-  targetType: z.enum(["listing", "event", "profile", "message", "community", "discussion_post", "discussion_comment"]),
+  targetType: z.enum(["listing", "event", "profile", "message", "conversation_request", "community", "discussion_post", "discussion_comment"]),
   targetId: uuidSchema,
   reason: z.enum(["fraud", "harassment", "prohibited_item", "spam", "unsafe", "other"]),
   details: z.string().trim().max(2000).default(""),
@@ -77,8 +84,17 @@ export const profileInputSchema = z.object({
   bio: z.string().trim().max(500).default("")
 });
 
-export const profileSearchSchema = z.object({ q: z.string().trim().min(2).max(80), limit: z.coerce.number().int().min(1).max(20).default(10) });
-export const conversationRequestInputSchema = z.object({ profileId: uuidSchema });
+export const profileSearchSchema = z.object({
+  q: z.string().trim().min(2).max(80),
+  campus: z.string().trim().toLowerCase().max(80).regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20)
+});
+export const conversationRequestInputSchema = z.object({
+  profileId: uuidSchema,
+  openingMessage: z.string().trim().min(10).max(500),
+  idempotencyKey: uuidSchema,
+  context: z.object({ type: z.enum(["listing", "event"]), id: uuidSchema }).optional()
+});
 export const conversationRequestResponseSchema = z.object({ response: z.enum(["accepted", "declined"]) });
 export const contentDeletionSchema = z.object({ reason: z.string().trim().min(3).max(1000).default("User deleted content") });
 export const mediaPurposeSchema = z.enum(["listing", "avatar", "banner", "community_icon", "community_banner", "discussion_post"]);
@@ -173,6 +189,8 @@ export type Listing = {
   priceCents: number;
   currency: string;
   status: ListingStatus;
+  visibility: z.infer<typeof contentVisibilitySchema>;
+  exchangeMethods: z.infer<typeof listingExchangeMethodSchema>[];
   createdAt: string;
   seller?: { handle: string; displayName: string };
   media?: { id: string; variantUrl: string; altText: string }[];
@@ -187,6 +205,7 @@ export type CampusEvent = {
   startsAt: string;
   endsAt: string;
   capacity: number | null;
+  visibility: z.infer<typeof contentVisibilitySchema>;
   attendeeCount: number;
   isAttending?: boolean;
 };

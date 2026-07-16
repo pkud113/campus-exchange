@@ -42,6 +42,8 @@ export function ListingForm() {
         description: form.get("description"),
         category: form.get("category"),
         condition: form.get("condition"),
+        visibility: form.get("visibility"),
+        exchangeMethods: form.getAll("exchangeMethods"),
         priceCents: Math.round(Number(form.get("price")) * 100),
         currency: "USD",
         idempotencyKey: idempotencyKey.current,
@@ -162,6 +164,18 @@ export function ListingForm() {
             />
           </div>
         </label>
+        <fieldset className="choice-fieldset">
+          <legend>Who can see this listing?</legend>
+          <label><input type="radio" name="visibility" value="campus_only" defaultChecked /> My campus only</label>
+          <label><input type="radio" name="visibility" value="network" /> All Campus Exchange campuses</label>
+        </fieldset>
+        <fieldset className="choice-fieldset">
+          <legend>Exchange or delivery</legend>
+          <label><input type="checkbox" name="exchangeMethods" value="campus_pickup" defaultChecked /> Campus pickup</label>
+          <label><input type="checkbox" name="exchangeMethods" value="in_person_meetup" /> In-person meetup</label>
+          <label><input type="checkbox" name="exchangeMethods" value="shipping" /> Shipping</label>
+          <label><input type="checkbox" name="exchangeMethods" value="digital_delivery" /> Digital delivery</label>
+        </fieldset>
       </section>
       {progress && (
         <p className="form-notice" role="status">

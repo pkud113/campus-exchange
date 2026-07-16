@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deliveryErrorMessage, deterministicNotificationId, discussionNotificationCopy, messageNotificationHref, retryDelaySeconds, shouldSuppressDiscussionNotification } from "./index";
+import { deliveryErrorMessage, deterministicNotificationId, discussionNotificationCopy, interactionNotificationCopy, messageNotificationHref, retryDelaySeconds, shouldSuppressDiscussionNotification } from "./index";
 
 describe("worker delivery helpers", () => {
   it("creates stable version-5 UUIDs", async () => {
@@ -32,5 +32,11 @@ describe("worker delivery helpers", () => {
   it("suppresses self notifications defensively", () => {
     expect(shouldSuppressDiscussionNotification({ actorId: "same", recipientId: "same" })).toBe(true);
     expect(shouldSuppressDiscussionNotification({ actorId: "a", recipientId: "b" })).toBe(false);
+  });
+  it("canonicalizes network interaction routes",()=>{
+    expect(interactionNotificationCopy("conversation_request.created",{} )?.href).toBe("/messages?view=incoming");
+    expect(interactionNotificationCopy("conversation_request.accepted",{conversationId:"11111111-1111-1111-1111-111111111111"})?.href).toContain("conversation=");
+    expect(interactionNotificationCopy("event.rsvp_created",{eventId:"22222222-2222-2222-2222-222222222222"})?.href).toBe("/events?event=22222222-2222-2222-2222-222222222222");
+    expect(interactionNotificationCopy("moderation.report_resolved",{})?.href).toBe("/notifications");
   });
 });

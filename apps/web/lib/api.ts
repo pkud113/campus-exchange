@@ -23,7 +23,7 @@ export async function requireVerified(request: Request): Promise<VerifiedContext
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) return apiError(request, 401, "unauthorized", "Sign in with your school email to continue.");
     const [{ data, error }, { data: authV2Enforced }] = await Promise.all([
-      supabase.from("profiles").select("campus_id,status,verified_until,account_kind,onboarding_completed_at,password_setup_required").eq("id", auth.user.id).single(),
+      supabase.from("profiles").select("campus_id,status,verified_until,account_kind,onboarding_completed_at,password_setup_required,campuses!inner(status)").eq("id", auth.user.id).eq("campuses.status","enabled").single(),
       supabase.rpc("auth_v2_enforced")
     ]);
     if (error || !data) return apiError(request, 403, "forbidden", "Complete student verification before using Campus Exchange.");
@@ -59,8 +59,11 @@ export function discussionMutationError(request: Request, error: { code?: string
 export async function requireStaff(request: Request, allowed: string[] = ["moderator", "admin"]) {
   const context = await requireVerified(request);
   if (context instanceof NextResponse) return context;
-  const { data } = await context.supabase.from("role_assignments").select("role").eq("profile_id", context.userId).in("role", allowed);
-  if (!data?.length) return apiError(request, 403, "forbidden", "Moderator access is required.");
+  const [{ data }, { data: platformRoles }] = await Promise.all([
+    context.supabase.from("role_assignments").select("role").eq("profile_id", context.userId).in("role", allowed),
+    context.supabase.from("platform_role_assignments").select("role").eq("profile_id", context.userId),
+  ]);
+  if (!data?.length && !platformRoles?.length) return apiError(request, 403, "forbidden", "Moderator access is required.");
   const {data:aal}=await context.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if(aal?.currentLevel!=="aal2")return apiError(request,403,"forbidden","Multi-factor authentication is required for staff actions.");
   return context;

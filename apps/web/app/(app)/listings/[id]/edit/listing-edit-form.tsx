@@ -21,6 +21,9 @@ type Listing = {
   condition: string;
   price_cents: number;
   currency: string;
+  visibility: "campus_only" | "network";
+  exchange_methods: string[] | null;
+  legacy_exchange_unspecified: boolean;
 };
 
 export function ListingEditForm({
@@ -60,6 +63,8 @@ export function ListingEditForm({
         condition: form.get("condition"),
         priceCents: Math.round(Number(form.get("price")) * 100),
         currency: "USD",
+        visibility: form.get("visibility"),
+        exchangeMethods: form.getAll("exchangeMethods"),
       }),
     });
     const body = await response.json().catch(() => null);
@@ -159,6 +164,11 @@ export function ListingEditForm({
             />
           </div>
         </label>
+        <fieldset><legend>Exchange methods</legend>
+          {([["campus_pickup","Campus pickup"],["in_person_meetup","In-person meetup"],["shipping","Shipping"],["digital_delivery","Digital delivery"]] as const).map(([value,label])=><label key={value}><input type="checkbox" name="exchangeMethods" value={value} defaultChecked={listing.exchange_methods?.includes(value)}/>{label}</label>)}
+          {listing.legacy_exchange_unspecified && <small>This legacy listing currently shows “Exchange details not specified.” Choose at least one method to save edits.</small>}
+        </fieldset>
+        <fieldset><legend>Visibility</legend><label><input type="radio" name="visibility" value="campus_only" defaultChecked={listing.visibility==="campus_only"}/>My campus only</label><label><input type="radio" name="visibility" value="network" defaultChecked={listing.visibility==="network"}/>Campus network</label></fieldset>
       </section>
       {progress && (
         <p className="form-notice" role="status">

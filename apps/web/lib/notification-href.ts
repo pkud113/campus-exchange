@@ -55,7 +55,9 @@ export function notificationHref(rawHref: string | null | undefined, kind?: stri
 
   if (url.pathname === "/messages" || url.pathname === "/messages/requests") {
     const conversationId = url.searchParams.get("conversation");
-    return conversationId && uuid.test(conversationId) ? `/messages?conversation=${conversationId}` : "/messages";
+    if (conversationId && uuid.test(conversationId)) return `/messages?conversation=${conversationId}`;
+    const view = url.pathname === "/messages/requests" ? "incoming" : url.searchParams.get("view");
+    return view === "incoming" || view === "sent" ? `/messages?view=${view}` : "/messages";
   }
 
   if (url.pathname === "/admin" || url.pathname.startsWith("/reports/")) {
@@ -64,6 +66,6 @@ export function notificationHref(rawHref: string | null | undefined, kind?: stri
     return reportId && uuid.test(reportId) ? `/admin?report=${reportId}` : "/admin";
   }
 
-  if (["/home", "/marketplace", "/discussions", "/notifications"].includes(url.pathname)) return url.pathname;
+  if (["/home", "/marketplace", "/people", "/discussions", "/notifications"].includes(url.pathname)) return url.pathname;
   return fallback;
 }

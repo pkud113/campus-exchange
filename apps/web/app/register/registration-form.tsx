@@ -55,7 +55,7 @@ export function RegistrationForm({ initialEmail = "", initiallySent = false }: {
   </form>;
 
   return <form className="auth-form auth-form-stacked" onSubmit={requestCode}>
-    <label>MSU email<input type="email" autoComplete="email" placeholder="netid@msu.edu" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
+    <label>School-issued email<input type="email" autoComplete="email" placeholder="name@university.edu" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
     <TurnstileWidget onToken={setTurnstileToken} resetKey={turnstileResetKey} />
     {error && <p className="form-error" role="alert">{error}</p>}
     <button className="button button-primary button-wide" disabled={busy || !turnstileToken}>{busy ? <><LoaderCircle className="spin" /> Sending...</> : "Send verification code"}</button>

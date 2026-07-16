@@ -15,7 +15,7 @@ export default async function EditEvent({
   const { data } = await db
     .from("events")
     .select(
-      "id,organizer_id,title,description,location,starts_at,ends_at,capacity,deleted_at",
+      "id,organizer_id,title,description,location,starts_at,ends_at,capacity,visibility,deleted_at",
     )
     .eq("id", id)
     .single();

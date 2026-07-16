@@ -3,19 +3,20 @@ import { createHash, randomBytes } from "node:crypto";
 
 const args = Object.fromEntries(process.argv.slice(2).map((value, index, all) => value.startsWith("--") ? [value.slice(2), all[index + 1]] : null).filter(Boolean));
 const email = String(args.email ?? "").trim().toLowerCase();
-const campusSlug = String(args.campus ?? "msu").trim().toLowerCase();
+const campusSlug = String(args.campus ?? "").trim().toLowerCase();
 const role = String(args.role ?? "admin").trim().toLowerCase();
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const secret = process.env.SUPABASE_SECRET_KEY;
 if (!url || !secret || !email.includes("@") || !["moderator", "admin"].includes(role)) {
-  console.error("Usage: pnpm admin:invite -- --email staff@example.com --campus msu --role admin");
+  console.error("Usage: pnpm admin:invite -- --email staff@example.com --campus campus-slug --role admin");
   console.error("Set SUPABASE_URL and SUPABASE_SECRET_KEY in the operator environment.");
   process.exit(1);
 }
 
 const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
-const { data: campus, error: campusError } = await admin.from("campuses").select("id,name").eq("slug", campusSlug).single();
+const { data: campus, error: campusError } = await admin.from("campuses").select("id,name,status").eq("slug", campusSlug).single();
 if (campusError || !campus) throw new Error(`Campus '${campusSlug}' was not found.`);
+if (campus.status !== "enabled") throw new Error(`Campus '${campusSlug}' is not enabled.`);
 const emailHash = createHash("sha256").update(email).digest("hex");
 const { data: invitation, error: inviteError } = await admin.from("staff_invitations").upsert({ email_hash: emailHash, campus_id: campus.id, role, expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), claimed_at: null }, { onConflict: "email_hash" }).select("id").single();
 if (inviteError) throw inviteError;

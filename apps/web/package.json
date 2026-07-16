@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests",
     "lint": "next lint || tsc --noEmit",
     "admin:invite": "node scripts/admin-invite.mjs",
+    "campus:admin": "node scripts/campus-admin.mjs",
     "auth:v2": "node scripts/auth-v2-cutover.mjs"
   },
   "dependencies": {

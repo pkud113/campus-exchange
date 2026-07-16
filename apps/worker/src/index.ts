@@ -48,6 +48,14 @@ export function messageNotificationHref(conversationId: string) {
   return uuid.test(conversationId) ? `/messages?conversation=${conversationId}` : "/messages";
 }
 
+export function interactionNotificationCopy(eventType:string,payload:Record<string,string>){
+  if(eventType==="conversation_request.created")return{title:"New message request",body:"A verified Campus Exchange member sent you a message request.",href:"/messages?view=incoming"};
+  if(eventType==="conversation_request.accepted")return{title:"Message request accepted",body:"Your message request was accepted.",href:messageNotificationHref(payload.conversationId??"")};
+  if(eventType==="event.rsvp_created")return{title:"New event RSVP",body:"A verified member RSVP’d to your event.",href:uuid.test(payload.eventId??"")?`/events?event=${payload.eventId}`:"/events"};
+  if(eventType==="moderation.report_resolved")return{title:"Report reviewed",body:"A moderation team reviewed a report you submitted.",href:"/notifications"};
+  return null;
+}
+
 export function discussionNotificationCopy(eventType: string, communitySlug: string, postId?: string, commentId?: string) {
   const href = postId && uuid.test(postId)
     ? `/discussions/posts/${postId}${commentId && uuid.test(commentId) ? `#discussion-comment-${commentId}` : ""}`
@@ -103,6 +111,16 @@ async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env
   }
 }
 
+async function deliverInteractionEvent(db:SupabaseClient,event:OutboxEvent){
+  const recipientId=event.payload.recipientId;const actorId=event.payload.actorId;const copy=interactionNotificationCopy(event.event_type,event.payload);
+  if(!recipientId||!copy)throw new Error("invalid interaction event payload");
+  if(actorId&&actorId===recipientId)return;
+  if(actorId){const{data:blocked,error}=await db.from("blocks").select("blocker_id").or(`and(blocker_id.eq.${recipientId},blocked_id.eq.${actorId}),and(blocker_id.eq.${actorId},blocked_id.eq.${recipientId})`).maybeSingle();if(error)throw error;if(blocked)return;}
+  const notificationId=await deterministicNotificationId(event.id,recipientId);
+  const kind=event.event_type==="event.rsvp_created"?"event":event.event_type==="moderation.report_resolved"?"moderation":"message_request";
+  const{error}=await db.from("notifications").upsert({id:notificationId,campus_id:event.campus_id,profile_id:recipientId,source_event_id:event.id,kind,title:copy.title,body:copy.body,href:copy.href},{onConflict:"id"});if(error)throw error;
+}
+
 async function deliverDiscussionEvent(db: SupabaseClient, event: OutboxEvent, env: Env) {
   const recipientId = event.payload.recipientId;
   const communityId = event.payload.communityId;
@@ -152,7 +170,8 @@ async function deliverDiscussionEvent(db: SupabaseClient, event: OutboxEvent, en
 }
 
 async function processEvent(db: SupabaseClient, event: OutboxEvent, env: Env) {
-  if (event.event_type === "message.created") return deliverMessageCreated(db, event, env);
+  if (event.event_type === "message.created") return event.payload.requestId ? undefined : deliverMessageCreated(db, event, env);
+  if (["conversation_request.created","conversation_request.accepted","event.rsvp_created","moderation.report_resolved"].includes(event.event_type)) return deliverInteractionEvent(db,event);
   if (discussionEventTypes.has(event.event_type)) return deliverDiscussionEvent(db, event, env);
   throw new Error(`unsupported outbox event: ${event.event_type}`);
 }

@@ -1,5 +1,17 @@
 "use client";
-import { Heart, MessageCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
+
+import { Heart } from "lucide-react";
 import { useState } from "react";
-export function ListingActions({listingId,isSeller,initialFavorite=false}:{listingId:string;isSeller:boolean;initialFavorite?:boolean}){const router=useRouter();const[busy,setBusy]=useState(false);const[favorite,setFavorite]=useState(initialFavorite);const[error,setError]=useState("");async function message(){setBusy(true);setError("");const response=await fetch("/api/v1/conversations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({listingId})});const result=await response.json();if(response.ok)router.push(`/messages?conversation=${result.data.id}`);else setError(result.error?.message??"Unable to start conversation.");setBusy(false)}async function save(){setBusy(true);setError("");const next=!favorite;const init:RequestInit={method:next?"POST":"DELETE"};if(next){init.headers={"content-type":"application/json"};init.body="{}"}const response=await fetch(`/api/v1/listings/${listingId}/favorite`,init);if(response.ok)setFavorite(next);else{const result=await response.json().catch(()=>null);setError(result?.error?.message??"Unable to update this saved listing.")}setBusy(false)}return <>{!isSeller&&<button className="button button-primary button-wide" onClick={message} disabled={busy}><MessageCircle/>{busy?"Opening…":"Message seller"}</button>}<button className="button button-ghost button-wide" onClick={save} disabled={busy} aria-pressed={favorite}><Heart fill={favorite?"currentColor":"none"}/>{favorite?"Saved":"Save listing"}</button>{error&&<p className="form-error" role="alert">{error}</p>}</>}
+import { MessageRequestComposer } from "@/components/message-request-composer";
+
+export function ListingActions({ listingId, sellerId, sellerUsername, sellerCampus, isSeller, initialFavorite = false }: {
+  listingId: string; sellerId: string; sellerUsername: string; sellerCampus: string; isSeller: boolean; initialFavorite?: boolean;
+}) {
+  const [busy,setBusy]=useState(false); const [favorite,setFavorite]=useState(initialFavorite); const [error,setError]=useState("");
+  async function save(){setBusy(true);setError("");const next=!favorite;const init:RequestInit={method:next?"POST":"DELETE"};if(next){init.headers={"content-type":"application/json"};init.body="{}"}const response=await fetch(`/api/v1/listings/${listingId}/favorite`,init);if(response.ok)setFavorite(next);else{const result=await response.json().catch(()=>null);setError(result?.error?.message??"Unable to update this saved listing.")}setBusy(false)}
+  return <>
+    {!isSeller && <MessageRequestComposer profileId={sellerId} username={sellerUsername} campus={sellerCampus} context={{type:"listing",id:listingId}} label="Message seller" />}
+    <button className="button button-ghost button-wide" onClick={save} disabled={busy} aria-pressed={favorite}><Heart fill={favorite?"currentColor":"none"}/>{favorite?"Saved":"Save listing"}</button>
+    {error&&<p className="form-error" role="alert">{error}</p>}
+  </>;
+}
