@@ -907,6 +907,21 @@ end $$;
 -- RLS is only evaluated after PostgreSQL table privileges. Keep direct reads explicit for
 -- the application surfaces that intentionally rely on RLS, while privileged mutations
 -- continue to flow through the narrow functions below.
+-- Production projects may retain broader legacy Data API grants than a clean local reset.
+-- Normalize those grants before asserting the privileged-write boundary.
+revoke insert, update, delete on table public.conversation_requests from anon, authenticated;
+revoke insert, update, delete on table public.conversations from anon, authenticated;
+revoke insert, update, delete on table public.conversation_participants from anon, authenticated;
+revoke insert, update, delete on table public.blocks from anon, authenticated;
+revoke insert, update, delete on table public.favorites from anon, authenticated;
+revoke insert, update, delete on table public.event_rsvps from anon, authenticated;
+revoke insert, update, delete on table public.reports from anon, authenticated;
+revoke insert, update, delete on table public.moderation_actions from anon, authenticated;
+revoke insert, update, delete on table public.notifications from anon, authenticated;
+revoke insert, update, delete on table public.outbox_events from anon, authenticated;
+revoke insert, update, delete on table public.audit_log from anon, authenticated;
+revoke insert, update, delete on table public.platform_role_assignments from anon, authenticated;
+
 grant select on table public.campuses to authenticated;
 grant select on table public.profiles to authenticated;
 grant select, insert on table public.listings to authenticated;
