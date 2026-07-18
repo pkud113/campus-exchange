@@ -89,5 +89,5 @@ jobs:
           printf '%s' "$BACKUP_ENCRYPTION_PASSWORD" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --decrypt --output "retrieved-$stamp.tar.gz" "retrieved-$stamp.tar.gz.gpg"
           mkdir restored-backup
           tar -xzf "retrieved-$stamp.tar.gz" -C restored-backup
-          (cd restored-backup/database-backup && sha256sum --check SHA256SUMS)
+          (cd restored-backup && sha256sum --check database-backup/SHA256SUMS)
           jq -e --arg commit "$GITHUB_SHA" --arg project_ref "$SUPABASE_PROJECT_REF" '.format_version == 1 and .commit == $commit and .project_ref == $project_ref' restored-backup/database-backup/MANIFEST.json >/dev/null
