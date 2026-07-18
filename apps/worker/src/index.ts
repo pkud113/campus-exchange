@@ -7,7 +7,7 @@ type Env = {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   APP_ORIGIN: string;
-  MEDIA_BUCKET: { delete: (key: string) => Promise<void> };
+  MEDIA_BUCKET: { delete: (key: string) => Promise<void>; head: (key: string) => Promise<unknown> };
 };
 
 type OutboxEvent = {
@@ -79,6 +79,32 @@ export function shouldSuppressDiscussionNotification(payload: Record<string, str
   return Boolean(payload.actorId && payload.actorId === payload.recipientId);
 }
 
+type EmailCategory = "messages" | "discussions";
+type EmailPreference = { email_messages?: boolean; email_discussions?: boolean; quiet_hours_start?: number | null; quiet_hours_end?: number | null } | null;
+
+export function notificationEmailAllowed(preference: EmailPreference, category: EmailCategory, now = new Date(), timeZone = "UTC") {
+  if (category === "messages" && preference?.email_messages === false) return false;
+  if (category === "discussions" && preference?.email_discussions === false) return false;
+  const start = preference?.quiet_hours_start;
+  const end = preference?.quiet_hours_end;
+  if (start == null || end == null) return true;
+  const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "2-digit", hourCycle: "h23", timeZone }).format(now));
+  const quiet = start < end ? hour >= start && hour < end : hour >= start || hour < end;
+  return !quiet;
+}
+
+async function canEmail(db: SupabaseClient, recipientId: string, category: EmailCategory) {
+  const [preferenceResult, profileResult] = await Promise.all([
+    db.from("notification_preferences").select("email_messages,email_discussions,quiet_hours_start,quiet_hours_end").eq("profile_id", recipientId).maybeSingle(),
+    db.from("profiles").select("campuses!inner(timezone)").eq("id", recipientId).maybeSingle()
+  ]);
+  if (preferenceResult.error) throw preferenceResult.error;
+  if (profileResult.error) throw profileResult.error;
+  const relation = profileResult.data?.campuses as unknown as { timezone?: string } | Array<{ timezone?: string }> | undefined;
+  const timeZone = (Array.isArray(relation) ? relation[0]?.timezone : relation?.timezone) ?? "UTC";
+  return notificationEmailAllowed(preferenceResult.data, category, new Date(), timeZone);
+}
+
 async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env: Env) {
   const conversationId = event.payload.conversationId;
   const senderId = event.payload.senderId;
@@ -97,7 +123,7 @@ async function deliverMessageCreated(db: SupabaseClient, event: OutboxEvent, env
     }, { onConflict: "id" });
     if (notificationError) throw notificationError;
     // Email is intentionally generic: private message text never enters logs or email payloads.
-    if (env.RESEND_API_KEY && env.EMAIL_FROM) {
+    if (env.RESEND_API_KEY && env.EMAIL_FROM && await canEmail(db, recipientId, "messages")) {
       const { data: userData } = await db.auth.admin.getUserById(recipientId);
       if (userData.user?.email) {
         const resend = new Resend(env.RESEND_API_KEY);
@@ -154,7 +180,7 @@ async function deliverDiscussionEvent(db: SupabaseClient, event: OutboxEvent, en
     href: copy.href
   }, { onConflict: "id" });
   if (notificationError) throw notificationError;
-  if (env.RESEND_API_KEY && env.EMAIL_FROM) {
+  if (env.RESEND_API_KEY && env.EMAIL_FROM && await canEmail(db, recipientId, "discussions")) {
     const { data: userData } = await db.auth.admin.getUserById(recipientId);
     if (userData.user?.email) {
       const resend = new Resend(env.RESEND_API_KEY);
@@ -184,17 +210,19 @@ async function runBatch(env: Env): Promise<number> {
   for (const event of (data ?? []) as OutboxEvent[]) {
     try {
       await processEvent(db, event, env);
-      await db.from("outbox_events").update({ status: "delivered", processed_at: new Date().toISOString(), last_error: null }).eq("id", event.id);
+      const { error: deliveredError } = await db.from("outbox_events").update({ status: "delivered", processed_at: new Date().toISOString(), last_error: null }).eq("id", event.id);
+      if (deliveredError) throw deliveredError;
       processed++;
     } catch (error) {
       const dead = event.attempt_count >= 8;
       const delaySeconds = retryDelaySeconds(event.attempt_count);
-      await db.from("outbox_events").update({
+      const { error: retryError } = await db.from("outbox_events").update({
         status: dead ? "dead_letter" : "pending",
         available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
         last_error: deliveryErrorMessage(error),
         locked_at: null
       }).eq("id", event.id);
+      if (retryError) throw retryError;
       console.error(JSON.stringify({ level: "error", event: "outbox_delivery_failed", outboxId: event.id, attempt: event.attempt_count, dead }));
     }
   }
@@ -249,6 +277,18 @@ export default {
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) { ctx.waitUntil(Promise.all([runBatch(env), runMaintenance(env)])); },
   async fetch(request: Request, env: Env) {
     if (new URL(request.url).pathname !== "/health") return new Response("Not found", { status: 404 });
-    return Response.json({ status: "ok", service: "campus-exchange-worker" });
+    const db = createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+    const [database, pending, storage] = await Promise.allSettled([
+      db.from("runtime_settings").select("key").limit(1),
+      db.from("outbox_events").select("created_at").eq("status", "pending").order("created_at", { ascending: true }).limit(1).maybeSingle(),
+      env.MEDIA_BUCKET.head("__campus_exchange_healthcheck__")
+    ]);
+    const databaseHealthy = database.status === "fulfilled" && !database.value.error;
+    const outboxHealthy = pending.status === "fulfilled" && !pending.value.error;
+    const storageHealthy = storage.status === "fulfilled";
+    const oldest = outboxHealthy && pending.status === "fulfilled" ? pending.value.data?.created_at : null;
+    const oldestPendingSeconds = oldest ? Math.max(0, Math.floor((Date.now() - Date.parse(oldest)) / 1000)) : 0;
+    const healthy = databaseHealthy && outboxHealthy && storageHealthy && oldestPendingSeconds < 900;
+    return Response.json({ status: healthy ? "ok" : "degraded", service: "campus-exchange-worker", checks: { database: databaseHealthy, outbox: outboxHealthy, objectStorage: storageHealthy, oldestPendingSeconds } }, { status: healthy ? 200 : 503, headers: { "cache-control": "no-store" } });
   }
 } satisfies ExportedHandler<Env>;

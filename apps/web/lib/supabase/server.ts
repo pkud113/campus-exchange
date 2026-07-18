@@ -11,7 +11,7 @@ export async function createSupabaseServerClient() {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (items: Array<{ name: string; value: string; options?: CookieOptions }>) => {
-        try { for (const item of items) item.options ? store.set(item.name, item.value, item.options as never) : store.set(item.name, item.value); } catch { /* Server components cannot set cookies. */ }
+        try { for (const item of items) { if (item.options) store.set(item.name, item.value, item.options as never); else store.set(item.name, item.value); } } catch { /* Server components cannot set cookies. */ }
       }
     }
   });

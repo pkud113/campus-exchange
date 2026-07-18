@@ -128,7 +128,7 @@ export function CommentsClient({ postId, currentUser, initialCommentCount = 0, l
   }
 
   function render(nodes: DiscussionCommentNode[]): React.ReactNode {
-    return nodes.map((comment) => <article className="discussion-comment" id={`discussion-comment-${comment.id}`} style={{ "--comment-depth": Math.min(comment.depth, 4) } as React.CSSProperties} key={comment.id}>
+    return nodes.map((comment) => <article className={`discussion-comment discussion-depth-${Math.min(comment.depth, 4)}`} id={`discussion-comment-${comment.id}`} key={comment.id}>
       <div className="comment-line"/>
       <DiscussionVote targetType="comments" targetId={comment.id} initialScore={comment.score} initialVote={comment.viewerVote ?? 0}/>
       <div className="comment-copy">

@@ -12,7 +12,8 @@
     "db:start": "supabase start",
     "admin:invite": "pnpm --filter @campus-exchange/web admin:invite",
     "campus:admin": "pnpm --filter @campus-exchange/web campus:admin",
-    "auth:v2": "pnpm --filter @campus-exchange/web auth:v2"
+    "auth:v2": "pnpm --filter @campus-exchange/web auth:v2",
+    "evidence:check": "node scripts/check-domain-evidence.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

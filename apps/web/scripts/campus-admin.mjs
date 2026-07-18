@@ -56,7 +56,7 @@ function confidence() {
 }
 
 if (command === "list") {
-  const { data, error } = await db.from("campuses").select("id,name,short_name,slug,city,region,country_code,timezone,status,campus_email_domains(domain,is_enabled,review_status,domain_kind,source_url,reviewed_at,review_notes)").order("name");
+  const { data, error } = await db.from("campuses").select("id,name,short_name,slug,city,region,country_code,timezone,status,campus_email_domains(domain,is_enabled,review_status,domain_kind,source_url,reviewed_at,review_expires_at,review_notes)").order("name");
   if (error) throw error;
   console.log(JSON.stringify(data, null, 2));
 } else if (command === "upsert") {
@@ -74,7 +74,7 @@ if (command === "list") {
   const status = String(args.status ?? "");
   if (!["enabled", "suspended", "disabled"].includes(status)) throw new Error("Choose --status enabled, suspended, or disabled.");
   if (status === "enabled") {
-    const { count } = await db.from("campus_email_domains").select("domain", { count: "exact", head: true }).eq("campus_id", target.id).eq("is_enabled", true).eq("review_status", "reviewed").in("domain_kind", ["student", "institutional"]);
+    const { count } = await db.from("campus_email_domains").select("domain", { count: "exact", head: true }).eq("campus_id", target.id).eq("is_enabled", true).eq("review_status", "reviewed").in("domain_kind", ["student", "institutional"]).gt("review_expires_at", new Date().toISOString());
     if (!count) throw new Error("A campus needs at least one reviewed, qualifying, enabled domain before activation.");
   }
   await preview(`set ${slug} status to ${status}`, { before: target.status, after: status }, async () => {
@@ -99,11 +99,12 @@ if (command === "list") {
   if (action === "review") {
     const kind = String(args.kind ?? "");
     if (!["student", "institutional", "shared", "alumni"].includes(kind)) throw new Error("Review requires --kind student, institutional, shared, or alumni.");
-    payload = { is_enabled: false, review_status: kind === "shared" ? "ambiguous" : "reviewed", domain_kind: kind, source_url: sourceUrl(), source_label: "Operator-reviewed official source", reviewed_at: new Date().toISOString(), review_notes: String(args.notes ?? "") || null, reviewed_by: reviewer(), review_confidence: confidence(), institution_id: args.institution ? String(args.institution) : existing?.institution_id ?? null };
+    const reviewedAt = new Date();
+    payload = { is_enabled: false, review_status: kind === "shared" ? "ambiguous" : "reviewed", domain_kind: kind, source_url: sourceUrl(), source_label: "Operator-reviewed official source", reviewed_at: reviewedAt.toISOString(), review_expires_at: new Date(reviewedAt.getTime() + 365 * 86400_000).toISOString(), review_notes: String(args.notes ?? "") || null, reviewed_by: reviewer(), review_confidence: confidence(), institution_id: args.institution ? String(args.institution) : existing?.institution_id ?? null };
   }
   if (action === "reject") payload = { is_enabled: false, review_status: "rejected", source_url: args["source-url"] ? sourceUrl() : existing?.source_url ?? null, reviewed_at: new Date().toISOString(), review_notes: String(args.notes ?? "Rejected by operator review"), reviewed_by: reviewer(), review_confidence: confidence() };
   if (action === "enable") {
-    if (existing.review_status !== "reviewed" || !["student", "institutional"].includes(existing.domain_kind) || !existing.source_url) throw new Error("Only a reviewed student/institutional mapping with an official source can be enabled.");
+    if (existing.review_status !== "reviewed" || !["student", "institutional"].includes(existing.domain_kind) || !existing.source_url || !existing.review_expires_at || new Date(existing.review_expires_at) <= new Date()) throw new Error("Only a current reviewed student/institutional mapping with an official source can be enabled.");
     const { data: collision } = await db.from("campus_email_domains").select("campus_id").eq("domain", domain).eq("is_enabled", true).neq("campus_id", target.id);
     if (collision?.length) throw new Error("Another campus already has this exact domain enabled. Resolve the shared-domain ambiguity first.");
     payload = { is_enabled: true };

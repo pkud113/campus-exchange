@@ -41,7 +41,7 @@ Never put secret/service keys in a `NEXT_PUBLIC_` value, a repository file, a sc
 ## Deployment sequence
 
 1. Verify the paid plans, spend caps, backups, DNS, and email-domain status.
-2. Run locally: `supabase db reset`, `supabase db lint --local --schema public,private --level error --fail-on error`, `supabase test db --local supabase/tests`, `pnpm typecheck`, `pnpm test`, `pnpm build`, and `pnpm audit --prod --audit-level high`.
+2. Run locally: `supabase db reset`, `supabase db lint --local --schema public,private --level error --fail-on error`, `supabase test db --local supabase/tests`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm --filter @campus-exchange/web e2e`, and `pnpm audit --prod --audit-level moderate`.
 3. Review all unapplied migrations, `data/institutions/ipeds-hd2024.json`, its pinned source URL/hash/count, and `data/college-directory.v1.json`; confirm every enabled domain still matches its first-party source, run linked Supabase security/performance advisors, and take the fresh logical backup.
 4. Push the reviewed commit to `main` and approve the protected `production` workflow.
 5. The workflow validates credentials, runs verification, ensures R2 exists, deploys the forward-compatible outbox worker, applies additive migrations, configures Supabase Auth, installs the web runtime secrets (including the pending-domain HMAC secret) before the new web code can receive traffic, deploys the web Worker, and checks apex/`www` health. Do not reverse the worker/migration ordering when new outbox types are present.
@@ -91,6 +91,8 @@ pnpm campus:admin -- list
 
 Campus creation never activates a campus. `domain --action add` creates an unreviewed, disabled mapping; review requires a qualifying kind and official HTTPS source, and enable remains a separate action. Enabling a campus requires at least one reviewed qualifying enabled exact domain. The database prevents two campuses from enabling the same exact domain. Disabling or removing the last enabled domain is refused unless `--confirm-last-domain` is explicitly supplied. Suspending/disabled campuses immediately fail active-member checks and disappear from network discovery; do not use that control without reviewing active-user impact.
 
+Reviewed domain evidence expires after one year. The migration gives existing enabled mappings at least 90 days of rollout grace; expired evidence resolves to `review_required` and cannot assign a campus. Run `pnpm evidence:check` or the monthly evidence-link workflow, manually re-read the first-party source, and repeat `domain --action review` with reviewer/confidence before expiry. Automated link availability never renews an approval by itself.
+
 ### Institution and verified-domain review
 
 Registration requires an IPEDS institution selection plus a school email. The selection is never authoritative. Reviewed exact-domain matches receive the normal Supabase registration OTP; every other eligible institution receives a separate ten-minute ownership code through Resend. Completion stores an HMAC of the address, the normalized domain, and institution ID. It creates no Auth user, profile, campus, or domain mapping.
@@ -134,6 +136,8 @@ Platform moderation is separate from campus administration and still requires an
 
 ## Production smoke and isolation checklist
 
+Deployment is fail-closed: the deploy workflow calls the complete reusable CI job, then creates and restore-verifies a fresh AES-256 encrypted R2 backup for that exact commit, and only then obtains the production environment. Web-only and commit-message bypasses are intentionally unsupported. Worker secrets are installed before the forward-compatible worker, migrations follow the worker, and web is last.
+
 - Registration: search active, closed, merged, Michigan, and Purdue directory entries; test MSU plus several reviewed launch domains; verify wrong-college mismatch, alumni/disabled rejection, shared-domain pending routing, ownership-code expiry/replay, no Auth user for pending requests, immutable server-derived campus assignment, and duplicate username rejection.
 - Existing account: one final OTP, retained username, password setup, then username/email login.
 - Recovery: identical start response for known/unknown identifiers, six-digit recovery code, new password, other sessions revoked.
@@ -145,6 +149,7 @@ Platform moderation is separate from campus administration and still requires an
 - Moderation: campus scope for creator-campus content, platform scope for eligible global abuse, denial without role/AAL2, protected report snapshot, staff safeguards, server-derived report routing, and append-only audit entries without message bodies or secrets.
 - Theme/PWA: system default, persisted light/dark override without flash, Turnstile theme, installability, offline public shell, and no offline mutation/private content.
 - Operations: Worker cron health, outbox retry/dead-letter behavior, R2 cleanup, pending-account purge, structured logs without email/message/OTP/signed URL values.
+- Notifications: message/discussion email opt-out, campus-local quiet hours, in-app notification retention, generic email content, and idempotent delivery.
 - Discussions: create a community with an immutable lowercase slug; verify automatic owner membership; join/leave from another verified profile; transfer ownership before the original owner leaves.
 - Discussion posts: create text, HTTPS link, and private-image posts; verify Hot/New/Top/Most Commented cursors; ensure pinned posts lead only inside their own community; edit and soft-delete an owned post.
 - Discussion threads: create a root comment and replies through depth eight, reject depth nine, preserve tombstones after deletion, reject new comments on locked/removed/deleted/archived targets.
@@ -157,7 +162,7 @@ Platform moderation is separate from campus administration and still requires an
 
 ## Backups, retention, and maintenance
 
-Supabase Pro supplies daily backups with seven-day retention. Copy an encrypted weekly `pg_dump` to a separate private R2 backup bucket; retain eight weekly and twelve monthly copies. Perform an isolated restore drill before launch and quarterly. Target RPO is 24 hours and RTO four hours.
+Supabase Pro supplies daily backups with seven-day retention. The repository backup workflow uploads an encrypted daily `pg_dump`, promotes Sunday runs to a weekly prefix and first-of-month runs to a monthly prefix, then enforces checked-in R2 lifecycle rules: 8 days for daily, 56 days for weekly, and 400 days for monthly. It downloads and decrypts every new daily object and validates its inner checksums and commit/project manifest before succeeding. Perform a separate isolated SQL restore drill before launch and quarterly. Target RPO is 24 hours and RTO four hours.
 
 The scheduled Worker processes outbox events and maintenance. Pending accounts older than 24 hours are deleted. Listings/events/media soft-delete immediately and are permanently purged after 30 days; R2 objects are removed before media rows. Discussion posts/comments retain structural tombstones but purge bodies, links, private attachments, moderation reasons, and permitted author references after 30 days. Deleted community slugs remain reserved. Ready discussion media that never binds to a target is removed after 24 hours.
 

@@ -52,6 +52,7 @@ export function ListingCard({
 }) {
   const [favorite, setFavorite] = useState(initialFavorite);
   const [busy, setBusy] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
   const media = listing.media_uploads?.find((item) => item.status === "ready");
   const seller = sellerFrom(listing.profiles);
   const sellerName = seller.display_name ?? seller.handle ?? "Verified student";
@@ -62,6 +63,7 @@ export function ListingCard({
     if (busy) return;
     const next = !favorite;
     setBusy(true);
+    setFavoriteError("");
     setFavorite(next);
     const init: RequestInit = { method: next ? "POST" : "DELETE" };
     if (next) {
@@ -69,7 +71,10 @@ export function ListingCard({
       init.body = "{}";
     }
     const response = await fetch(`/api/v1/listings/${listing.id}/favorite`, init).catch(() => null);
-    if (!response?.ok) setFavorite(!next);
+    if (!response?.ok) {
+      setFavorite(!next);
+      setFavoriteError("Couldn't update. Try again.");
+    }
     setBusy(false);
   }
 
@@ -109,6 +114,7 @@ export function ListingCard({
       >
         <Heart aria-hidden="true" fill={favorite ? "currentColor" : "none"} />
       </button>
+      {favoriteError && <span className="favorite-error" role="alert">{favoriteError}</span>}
     </article>
   );
 }

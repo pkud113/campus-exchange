@@ -20,13 +20,13 @@ The landing page works without credentials. Authenticated features require all m
 
 ## Verification
 
-Run `supabase db reset`, `supabase db lint --local --level error --fail-on error`, `supabase test db --local supabase/tests`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. The worker build is a Wrangler dry run and the web build is the production Next.js/OpenNext build.
+Run `supabase db reset`, `supabase db lint --local --level error --fail-on error`, `supabase test db --local supabase/tests`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm build`. Build the web app, install Playwright Chromium, then run `pnpm --filter @campus-exchange/web e2e` for desktop/mobile smoke, overflow, and serious/critical accessibility checks. The worker build is a Wrangler dry run and the web build is the production Next.js/OpenNext build.
 
 Isolation tests use synthetic Campus Alpha, Campus Beta, and an inactive campus. Directory tests verify the complete IPEDS import, reviewed real-college mappings, searchable closed/merged records, server-derived assignment, shared-domain rejection, hashed email-ownership challenges, idempotent pending requests, and atomic operator approval/merge workflows.
 
 ## Campus operations
 
-`pnpm campus:admin -- institutions --query Michigan` searches the national directory, `domain-requests` reads verified pending mappings, and `list` reads campus/domain state. Mutations preview by default and require `--apply`; review records evidence, reviewer, confidence, and date before a separate domain/campus enable action. See [the production runbook](docs/operations.md) for request review, duplicate merging, activation readback, feature disable, and rollback.
+`pnpm campus:admin -- institutions --query Michigan` searches the national directory, `domain-requests` reads verified pending mappings, and `list` reads campus/domain state. Mutations preview by default and require `--apply`; review records evidence, reviewer, confidence, date, and a one-year expiry before a separate domain/campus enable action. A monthly workflow checks bundled evidence links, but an operator must re-review evidence before extending it. See [the production runbook](docs/operations.md) for request review, duplicate merging, activation readback, feature disable, and rollback.
 
 The [multi-campus design contract](docs/multi-campus.md) explicitly separates verified repository facts, implementation decisions, recommended defaults, assumptions, and local execution-environment observations.
 
@@ -42,4 +42,4 @@ Discussion media stays private and uses the existing upload transformation pipel
 
 Production targets `https://campus-exchange.net`. Do not push the Phase 1 release to `main` until Cloudflare Workers Paid and Supabase Pro are active: `main` currently triggers the protected production deployment workflow.
 
-Follow [the production runbook](docs/operations.md) in order. It includes the backup, secret inventory, staff invitation, MFA, auth-v2 cutover, smoke tests, rollback, and user actions that cannot be automated from the repository.
+Follow [the production runbook](docs/operations.md) in order. A production deployment cannot run until the reusable full CI workflow passes and a fresh encrypted backup has been downloaded, decrypted, extracted, and checksum-verified. There is no commit-message or web-only bypass. The runbook includes the secret inventory, staff invitation, MFA, auth-v2 cutover, smoke tests, rollback, and user actions that cannot be automated from the repository.

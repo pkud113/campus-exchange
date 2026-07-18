@@ -167,8 +167,7 @@ export function AppNavigation({
   useEffect(() => {
     if (!menuOpen) return;
     previousFocus.current = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.classList.add("app-menu-open");
     const drawer = drawerRef.current;
     const focusable = () =>
       Array.from(
@@ -195,7 +194,7 @@ export function AppNavigation({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.classList.remove("app-menu-open");
       document.removeEventListener("keydown", onKeyDown);
       previousFocus.current?.focus();
     };

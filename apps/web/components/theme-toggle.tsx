@@ -7,7 +7,6 @@ import { resolveTheme, type Theme } from "@/lib/theme";
 export function applyTheme(theme: Theme) {
   const resolved = resolveTheme(theme, matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.dataset.theme = resolved;
-  document.documentElement.style.colorScheme = resolved;
   localStorage.setItem("campus-theme", theme);
   document.cookie = `campus-theme=${theme}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
 }

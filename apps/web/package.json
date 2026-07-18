@@ -8,8 +8,9 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "lint": "next lint || tsc --noEmit",
+    "test": "vitest run --passWithNoTests --exclude e2e/**",
+    "lint": "next lint --max-warnings 0",
+    "e2e": "playwright test",
     "admin:invite": "node scripts/admin-invite.mjs",
     "campus:admin": "node scripts/campus-admin.mjs",
     "auth:v2": "node scripts/auth-v2-cutover.mjs"
@@ -27,10 +28,14 @@
     "zod": "^3.25.67"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250705.0",
+    "@axe-core/playwright": "^4.12.1",
+    "@cloudflare/workers-types": "^5.20260708.1",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "15.5.7",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4",
     "wrangler": "^4.110.0"

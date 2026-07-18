@@ -1,7 +1,7 @@
 import { registrationStartSchema } from "@campus-exchange/contracts";
 import { decideInstitutionRegistration, normalizeSchoolDomain } from "@campus-exchange/domain";
 import { NextResponse } from "next/server";
-import { apiData, apiError, enforceRateLimit, parseJson, verifyMutationOrigin } from "@/lib/api";
+import { apiData, apiError, enforceRateLimits, parseJson, verifyMutationOrigin } from "@/lib/api";
 import { sha256 } from "@/lib/auth";
 import { beginInstitutionDomainVerification } from "@/lib/institution-verification";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
@@ -10,11 +10,17 @@ import { verifyTurnstile } from "@/lib/turnstile";
 export async function POST(request: Request) {
   const originError = verifyMutationOrigin(request); if (originError) return originError;
   const input = await parseJson(request, registrationStartSchema); if (input instanceof NextResponse) return input;
-  const limited = await enforceRateLimit(request, "registration-otp", `${request.headers.get("cf-connecting-ip") ?? "local"}:${input.email}`, 5, 600); if (limited) return limited;
+  const clientAddress = request.headers.get("cf-connecting-ip") ?? "local";
+  const emailDomain = normalizeSchoolDomain(input.email);
+  const limited = await enforceRateLimits(request, [
+    { scope: "registration-otp-ip", subject: clientAddress, limit: 20, windowSeconds: 600 },
+    { scope: "registration-otp-account", subject: input.email, limit: 5, windowSeconds: 600 },
+    { scope: "registration-otp-domain", subject: emailDomain, limit: 100, windowSeconds: 3600 }
+  ]); if (limited) return limited;
   const challengeError = await verifyTurnstile(request, input.turnstileToken); if (challengeError) return challengeError;
   try {
     const admin = createSupabaseAdminClient();
-    const domain = normalizeSchoolDomain(input.email);
+    const domain = emailDomain;
     const { data: institution, error: institutionError } = await admin.from("institution_directory")
       .select("id,name,status,registration_status,campus_id")
       .eq("id", input.institutionId)

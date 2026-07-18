@@ -1,11 +1,16 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 type Domain = { domain: string; kind: string; status: string; enabled: boolean; sourceUrl: string };
 type Campus = { slug: string; status: string; domains: Domain[] };
 const directory = JSON.parse(readFileSync(resolve(process.cwd(), "../../data/college-directory.v1.json"), "utf8")) as { version: number; reviewedAt: string; campuses: Campus[] };
-const migration = readFileSync(resolve(process.cwd(), "../../supabase/migrations/20260717163055_college_directory_onboarding.sql"), "utf8");
+const migrationsDirectory = resolve(process.cwd(), "../../supabase/migrations");
+const migrationChain = readdirSync(migrationsDirectory)
+  .filter((name) => name.endsWith(".sql"))
+  .sort()
+  .map((name) => readFileSync(resolve(migrationsDirectory, name), "utf8"))
+  .join("\n");
 const institutionArtifact = JSON.parse(readFileSync(resolve(process.cwd(), "../../data/institutions/ipeds-hd2024.json"), "utf8")) as {
   source: string; sourceYear: number; sourceUrl: string; csvSha256: string; institutionCount: number;
   institutions: Array<{ id: string; name: string; status: string; mergedIntoId: string | null }>;
@@ -40,12 +45,12 @@ describe("reviewed college directory", () => {
     expect(new Set(active).size).toBe(active.length);
   });
 
-  it("keeps the transactional migration aligned with the reviewed data file", () => {
+  it("keeps the forward migration chain aligned with the reviewed data file", () => {
     for (const campus of directory.campuses) {
-      expect(migration).toContain(`'${campus.slug}'`);
+      expect(migrationChain).toContain(`'${campus.slug}'`);
       for (const domain of campus.domains) {
-        expect(migration).toContain(`'${domain.domain}'`);
-        expect(migration).toContain(domain.sourceUrl);
+        expect(migrationChain).toContain(`'${domain.domain}'`);
+        expect(migrationChain).toContain(domain.sourceUrl);
       }
     }
   });

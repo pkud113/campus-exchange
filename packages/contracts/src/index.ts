@@ -9,6 +9,25 @@ export const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{
 export const passwordSchema = z.string().min(12).max(72);
 export const loginIdentifierSchema = z.string().trim().min(3).max(254);
 export const turnstileTokenSchema = z.string().max(2048).optional();
+
+const redirectOrigin = "https://campus-exchange.internal";
+
+/** Returns a canonical same-origin application path, or null for unsafe input. */
+export function safeInternalRedirectPath(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 512) return null;
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f\u007f]/.test(value)) return null;
+  let decoded: string;
+  let url: URL;
+  try {
+    decoded = decodeURIComponent(value);
+    url = new URL(value, redirectOrigin);
+  } catch {
+    return null;
+  }
+  if (decoded.includes("\\") || decoded.startsWith("//") || /[\u0000-\u001f\u007f]/.test(decoded)) return null;
+  if (url.origin !== redirectOrigin || url.username || url.password) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
+}
 export const institutionIdSchema = z.string().regex(/^ipeds:[0-9]{6}$/);
 export const institutionSearchSchema = z.object({
   q: z.string().trim().max(120).default(""),
@@ -29,10 +48,22 @@ export const schoolRequestVerifySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   code: z.string().regex(/^[0-9]{6}$/)
 }).strict();
-export const loginInputSchema = z.object({ identifier: loginIdentifierSchema, password: passwordSchema, turnstileToken: turnstileTokenSchema, next: z.string().max(512).regex(/^\/(?!\/)/).optional() });
+export const loginInputSchema = z.object({
+  identifier: loginIdentifierSchema,
+  password: passwordSchema,
+  turnstileToken: turnstileTokenSchema,
+  next: z.string().max(512).refine((value) => safeInternalRedirectPath(value) !== null, "Redirect path must stay within Campus Exchange.").transform((value) => safeInternalRedirectPath(value) as string).optional()
+}).strict();
 export const onboardingInputSchema = z.object({ username: usernameSchema, password: passwordSchema });
 export const passwordResetStartSchema = z.object({ identifier: loginIdentifierSchema, turnstileToken: turnstileTokenSchema });
 export const passwordResetCompleteSchema = z.object({ password: passwordSchema });
+export const notificationPreferenceInputSchema = z.object({
+  emailMessages: z.boolean(),
+  emailDiscussions: z.boolean(),
+  quietHoursStart: z.number().int().min(0).max(23).nullable(),
+  quietHoursEnd: z.number().int().min(0).max(23).nullable()
+}).strict().refine((value) => (value.quietHoursStart === null) === (value.quietHoursEnd === null), { message: "Set both quiet-hour values or neither." })
+  .refine((value) => value.quietHoursStart === null || value.quietHoursStart !== value.quietHoursEnd, { message: "Quiet hours must cover less than a full day." });
 
 export const listingStatusSchema = z.enum(["draft", "active", "reserved", "sold", "withdrawn"]);
 export type ListingStatus = z.infer<typeof listingStatusSchema>;

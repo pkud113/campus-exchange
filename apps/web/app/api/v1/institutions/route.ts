@@ -1,5 +1,4 @@
 import { institutionSearchSchema } from "@campus-exchange/contracts";
-import { NextResponse } from "next/server";
 import { apiData, apiError, enforceRateLimit } from "@/lib/api";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 

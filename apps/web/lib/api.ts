@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import type { ApiErrorCode } from "@campus-exchange/contracts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { discussionErrorStatus, mutationOriginStatus } from "@/lib/api-rules";
+import { discussionErrorStatus, mutationOriginStatus, requireBooleanSetting, trustedRequestId } from "@/lib/api-rules";
 
 export type VerifiedContext = { userId: string; campusId: string; requestId: string; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> };
 
-export function requestId(request: Request): string { return request.headers.get("x-request-id") ?? crypto.randomUUID(); }
+export function requestId(request: Request): string { return trustedRequestId(request.headers.get("x-request-id")) ?? crypto.randomUUID(); }
 
 export function apiError(request: Request, status: number, code: ApiErrorCode, message: string, details?: unknown) {
   const payload = { error: { code, message, requestId: requestId(request), ...(details === undefined ? {} : { details }) } };
@@ -22,10 +22,12 @@ export async function requireVerified(request: Request): Promise<VerifiedContext
     const supabase = await createSupabaseServerClient();
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) return apiError(request, 401, "unauthorized", "Sign in with your school email to continue.");
-    const [{ data, error }, { data: authV2Enforced }] = await Promise.all([
+    const [profileResult, enforcementResult] = await Promise.all([
       supabase.from("profiles").select("campus_id,status,verified_until,account_kind,onboarding_completed_at,password_setup_required,campuses!inner(status)").eq("id", auth.user.id).eq("campuses.status","enabled").single(),
       supabase.rpc("auth_v2_enforced")
     ]);
+    const { data, error } = profileResult;
+    const authV2Enforced = requireBooleanSetting(enforcementResult, "auth_v2_enforcement");
     if (error || !data) return apiError(request, 403, "forbidden", "Complete student verification before using Campus Exchange.");
     if (!data.onboarding_completed_at || (authV2Enforced === true && data.password_setup_required)) return apiError(request, 403, "forbidden", "Complete account setup before using Campus Exchange.");
     if (data.status !== "active") return apiError(request, 403, "forbidden", "This account is not active.");
@@ -34,7 +36,7 @@ export async function requireVerified(request: Request): Promise<VerifiedContext
   } catch (error) {
     if (error instanceof Error && error.message === "service_unconfigured") return apiError(request, 503, "service_unconfigured", "Connect a Supabase project to enable this feature.");
     console.error(JSON.stringify({ level: "error", event: "auth_context_failed", requestId: requestId(request) }));
-    return apiError(request, 500, "internal_error", "Unable to verify this request.");
+    return apiError(request, 503, "service_unconfigured", "Account verification is temporarily unavailable.");
   }
 }
 
@@ -104,6 +106,14 @@ export async function enforceRateLimit(request: Request, scope: string, subject:
   } catch {
     console.error(JSON.stringify({ level: "error", event: "rate_limit_unavailable", requestId: requestId(request), scope }));
     return apiError(request, 503, "service_unconfigured", "Request protection is temporarily unavailable. Please retry shortly.");
+  }
+  return null;
+}
+
+export async function enforceRateLimits(request: Request, buckets: Array<{ scope: string; subject: string; limit: number; windowSeconds: number }>): Promise<NextResponse | null> {
+  for (const bucket of buckets) {
+    const result = await enforceRateLimit(request, bucket.scope, bucket.subject, bucket.limit, bucket.windowSeconds);
+    if (result) return result;
   }
   return null;
 }

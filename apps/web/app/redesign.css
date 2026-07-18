@@ -454,6 +454,7 @@ svg { flex: 0 0 auto; }
 .favorite:hover { transform: scale(1.06); background: var(--paper); }
 .favorite svg { width: 18px; }
 .favorite.active { color: var(--danger); background: var(--paper); }
+.favorite-error { position: absolute; z-index: 3; top: 54px; right: 10px; max-width: calc(100% - 20px); border-radius: 8px; background: var(--danger); color: #fff; padding: 5px 8px; font-size: 11px; font-weight: 750; box-shadow: var(--elevation-1); }
 .listing-details { padding: 14px; }
 .listing-price { display: block; color: var(--ink); font: 760 21px/1.1 Georgia, serif; }
 .listing-details h3 { margin: 5px 0 12px; overflow: hidden; font: 650 15px/1.25 Inter, ui-sans-serif, system-ui, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
@@ -567,6 +568,21 @@ svg { flex: 0 0 auto; }
   background: var(--paper);
 }
 .listing-form textarea, .settings-form textarea, .report-detail textarea { min-height: 120px; }
+.notification-preferences { margin-top: 24px; }
+.notification-preferences .check-row { display: flex; align-items: center; gap: 10px; }
+.notification-preferences .check-row input { width: auto; margin: 0; }
+.event-preview > span { color: var(--danger); }
+.discussion-comment.discussion-depth-0 { margin-left: 0; }
+.discussion-comment.discussion-depth-1 { margin-left: 19px; }
+.discussion-comment.discussion-depth-2 { margin-left: 38px; }
+.discussion-comment.discussion-depth-3 { margin-left: 57px; }
+.discussion-comment.discussion-depth-4 { margin-left: 76px; }
+@media (max-width: 760px) {
+  .discussion-comment.discussion-depth-1 { margin-left: 9px; }
+  .discussion-comment.discussion-depth-2 { margin-left: 18px; }
+  .discussion-comment.discussion-depth-3 { margin-left: 27px; }
+  .discussion-comment.discussion-depth-4 { margin-left: 36px; }
+}
 .listing-form input:focus, .listing-form textarea:focus, .listing-form select:focus, .settings-form input:focus, .settings-form textarea:focus, .report-detail textarea:focus, .auth-form-stacked input:focus, .otp-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 17%, transparent); }
 .form-aside > div { border-radius: var(--radius-md); box-shadow: var(--elevation-1); }
 .photo-drop { border-radius: var(--radius-md); background: var(--surface-subtle); }

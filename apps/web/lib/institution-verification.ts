@@ -37,20 +37,28 @@ export async function beginInstitutionDomainVerification(input: {
   if (insertError) throw insertError;
 
   const safeName = escapeHtml(input.institutionName);
-  const delivery = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      from,
-      to: [input.email],
-      subject: "Verify your school email for Campus Exchange",
-      text: `Your Campus Exchange school-domain verification code is ${code}. It expires in 10 minutes. This verifies email ownership only; registration remains unavailable until the domain mapping is reviewed.`,
-      html: `<p>Your Campus Exchange school-domain verification code for <strong>${safeName}</strong> is:</p><p style="font-size:24px;font-weight:700;letter-spacing:4px">${code}</p><p>It expires in 10 minutes. This verifies email ownership only; registration remains unavailable until the domain mapping is reviewed.</p>`
-    })
-  });
-  if (!delivery.ok) {
-    await admin.from("institution_domain_verification_challenges").delete().eq("id", id);
-    throw new Error(`domain_verification_delivery_${delivery.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const delivery = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [input.email],
+        subject: "Verify your school email for Campus Exchange",
+        text: `Your Campus Exchange school-domain verification code is ${code}. It expires in 10 minutes. This verifies email ownership only; registration remains unavailable until the domain mapping is reviewed.`,
+        html: `<p>Your Campus Exchange school-domain verification code for <strong>${safeName}</strong> is:</p><p style="font-size:24px;font-weight:700;letter-spacing:4px">${code}</p><p>It expires in 10 minutes. This verifies email ownership only; registration remains unavailable until the domain mapping is reviewed.</p>`
+      })
+    });
+    if (!delivery.ok) throw new Error(`domain_verification_delivery_${delivery.status}`);
+  } catch (error) {
+    const { error: cleanupError } = await admin.from("institution_domain_verification_challenges").delete().eq("id", id);
+    if (cleanupError) console.error(JSON.stringify({ level: "error", event: "domain_verification_cleanup_failed", challengeId: id }));
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
   return { challengeId: id, expiresAt };
 }

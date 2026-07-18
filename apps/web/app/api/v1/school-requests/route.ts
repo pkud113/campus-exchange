@@ -1,7 +1,7 @@
 import { schoolRequestSchema } from "@campus-exchange/contracts";
 import { normalizeSchoolDomain } from "@campus-exchange/domain";
 import { NextResponse } from "next/server";
-import { apiData, apiError, enforceRateLimit, parseJson, verifyMutationOrigin } from "@/lib/api";
+import { apiData, apiError, enforceRateLimits, parseJson, verifyMutationOrigin } from "@/lib/api";
 import { beginInstitutionDomainVerification } from "@/lib/institution-verification";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -11,7 +11,11 @@ export async function POST(request: Request) {
   const input = await parseJson(request, schoolRequestSchema); if (input instanceof NextResponse) return input;
   const domain = normalizeSchoolDomain(input.email);
   const clientAddress = request.headers.get("cf-connecting-ip") ?? "local";
-  const limited = await enforceRateLimit(request, "school-request", `${clientAddress}:${domain}`, 3, 86400); if (limited) return limited;
+  const limited = await enforceRateLimits(request, [
+    { scope: "school-request-ip", subject: clientAddress, limit: 10, windowSeconds: 86400 },
+    { scope: "school-request-domain", subject: domain, limit: 25, windowSeconds: 86400 },
+    { scope: "school-request-account", subject: input.email, limit: 3, windowSeconds: 86400 }
+  ]); if (limited) return limited;
   const challengeError = await verifyTurnstile(request, input.turnstileToken); if (challengeError) return challengeError;
 
   try {
@@ -40,7 +44,7 @@ export async function POST(request: Request) {
       requesterAddress: clientAddress
     });
     return apiData(request, { sent: true, challengeId: verification.challengeId, expiresAt: verification.expiresAt }, 202);
-  } catch (error) {
+  } catch {
     console.error(JSON.stringify({ level: "error", event: "school_request_failed", requestId: request.headers.get("x-request-id") ?? "unknown" }));
     return apiError(request, 503, "service_unconfigured", "School requests are temporarily unavailable.");
   }

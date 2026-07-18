@@ -61,6 +61,6 @@ These are observations from the implementation workstation, not permanent reposi
 
 - Node.js reported `v22.18.0`; local pnpm reported `11.7.0`. The repository declares pnpm `11.13.0`, and CI installs Node 22 plus pnpm 11.13.0.
 - Supabase CLI `2.109.1` was verified through the package runner and is pinned in the production workflow.
-- A clean local database reset applied every migration and seed successfully. The final pgTAP run passed all 212 checks across four files; the monorepo Vitest run passed all 101 tests; TypeScript checks passed in all four packages.
+- A clean local database reset applied every migration and seed successfully. The final pgTAP run passed all 228 checks across five files; the monorepo Vitest run passed all 111 tests; TypeScript checks passed in all four packages.
 - The production build completed locally, including the Wrangler worker dry run and Next.js/OpenNext application build. Local Supabase security/performance advisors reported no errors; they retained three known performance warnings for separate owner/staff update policies on listings, events, and media. The production workflow runs linked advisors both before and after migration application and blocks on advisor errors.
 - Production dependency audit reported no known vulnerabilities. A localhost registration smoke test confirmed reviewed MSU is labeled supported, Michigan physical campuses remain distinct domain-review choices, and the selected directory institution is explicitly non-authoritative.

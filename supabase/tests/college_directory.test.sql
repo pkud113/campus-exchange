@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(44);
+select plan(48);
 
 select is((select count(*)::integer from public.campuses where status='enabled' and slug in (
   'michigan-state-university','university-of-illinois-urbana-champaign','university-of-wisconsin-madison','university-of-chicago',
@@ -19,6 +19,8 @@ select is((select resolution from private.resolve_registration_domain('unknown-s
 select is((select resolution from private.resolve_registration_domain('purdue.edu')),'ambiguous','shared Purdue domain is ambiguous');
 select is((select resolution from private.resolve_registration_domain('umich.edu')),'ambiguous','shared Michigan domain is ambiguous');
 select is((select resolution from private.resolve_registration_domain('aya.yale.edu')),'alumni','alumni-only domain is rejected explicitly');
+select has_column('public','campus_email_domains','review_expires_at','domain reviews have an explicit expiry');
+select is((select count(*)::integer from public.campus_email_domains where is_enabled and review_status='reviewed' and domain_kind in ('student','institutional') and review_expires_at is null),0,'enabled reviewed domains always have an expiry');
 
 insert into public.campuses(id,name,short_name,slug,timezone,status) values
   ('d0000000-0000-4000-8000-000000000001','Directory Disabled','Disabled','directory-disabled','America/Chicago','disabled'),
@@ -33,6 +35,9 @@ select is((select resolution from private.resolve_registration_domain('pending.t
 select is((select resolution from private.resolve_registration_domain('disabled.test')),'domain_disabled','disabled reviewed domain is rejected');
 select is((select resolution from private.resolve_registration_domain('campus-disabled.test')),'campus_disabled','disabled campus is rejected');
 select is((select campus_id from private.resolve_registration_domain('students.msu.test')),(select id from public.campuses where slug='michigan-state-university'),'multiple reviewed domains can map to one campus');
+select ok((select review_expires_at>reviewed_at from public.campus_email_domains where domain='students.msu.test'),'new reviews receive a bounded default validity period');
+update public.campus_email_domains set reviewed_at=now()-interval '2 years',review_expires_at=now()-interval '1 year' where domain='students.msu.test';
+select is((select resolution from private.resolve_registration_domain('students.msu.test')),'review_required','expired evidence fails closed into operator review');
 select ok(exists(select 1 from pg_indexes where schemaname='public' and indexname='campus_email_domains_one_active_mapping_idx' and indexdef ilike 'create unique index%'),'active exact domains have one-campus uniqueness');
 select ok(exists(select 1 from pg_constraint where conname='campus_email_domains_activation_check' and convalidated),'domain activation constraint is validated');
 select is(has_function_privilege('authenticated','public.registration_domain_resolution(text)','EXECUTE'),false,'browser-authenticated users cannot call the registration resolver');

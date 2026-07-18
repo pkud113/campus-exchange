@@ -1,6 +1,7 @@
 name: Backup production database
 
 on:
+  workflow_call:
   schedule:
     - cron: "17 8 * * *"
   workflow_dispatch:
@@ -20,15 +21,15 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: pnpm/action-setup@b0f76dfb45f55f8421693e4803ac7bb65143bd34 # v6
         with:
           version: 11.13.0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
         with:
           version: 2.109.1
       - run: pnpm install --frozen-lockfile
@@ -47,6 +48,8 @@ jobs:
           if ! pnpm --dir apps/worker exec wrangler r2 bucket list | grep -q 'campus-exchange-backups'; then
             pnpm --dir apps/worker exec wrangler r2 bucket create campus-exchange-backups
           fi
+          pnpm --dir apps/worker exec wrangler r2 bucket lifecycle set campus-exchange-backups --file ../../.github/r2-backup-lifecycle.json --force
+          pnpm --dir apps/worker exec wrangler r2 bucket lifecycle list campus-exchange-backups
       - name: Dump, encrypt, and upload database
         shell: bash
         run: |
@@ -56,15 +59,35 @@ jobs:
           supabase db dump --linked --file database-backup/roles.sql --role-only
           supabase db dump --linked --file database-backup/schema.sql
           supabase db dump --linked --file database-backup/data.sql --data-only --use-copy
+          supabase migration list --linked > database-backup/migrations.txt
           test -s database-backup/roles.sql
           test -s database-backup/schema.sql
           test -s database-backup/data.sql
-          sha256sum database-backup/*.sql > database-backup/SHA256SUMS
+          test -s database-backup/migrations.txt
+          sha256sum database-backup/*.sql database-backup/migrations.txt > database-backup/SHA256SUMS
+          jq -n \
+            --arg created_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg commit "$GITHUB_SHA" \
+            --arg project_ref "$SUPABASE_PROJECT_REF" \
+            --arg workflow_run "$GITHUB_RUN_ID" \
+            '{format_version:1,created_at:$created_at,commit:$commit,project_ref:$project_ref,workflow_run:$workflow_run}' \
+            > database-backup/MANIFEST.json
           tar -czf "database-$stamp.tar.gz" database-backup
-          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in "database-$stamp.tar.gz" -out "database-$stamp.tar.gz.enc" -pass env:BACKUP_ENCRYPTION_PASSWORD
-          test -s "database-$stamp.tar.gz.enc"
-          encrypted_digest="$(sha256sum "database-$stamp.tar.gz.enc" | cut -d ' ' -f 1)"
-          object_key="campus-exchange-backups/database/database-$stamp.tar.gz.enc"
-          pnpm --dir apps/worker exec wrangler r2 object put "$object_key" --file "../../database-$stamp.tar.gz.enc" --remote
-          pnpm --dir apps/worker exec wrangler r2 object get "$object_key" --file "../../retrieved-$stamp.tar.gz.enc" --remote
-          echo "$encrypted_digest  retrieved-$stamp.tar.gz.enc" | sha256sum --check
+          printf '%s' "$BACKUP_ENCRYPTION_PASSWORD" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 --s2k-digest-algo SHA512 --output "database-$stamp.tar.gz.gpg" "database-$stamp.tar.gz"
+          test -s "database-$stamp.tar.gz.gpg"
+          encrypted_digest="$(sha256sum "database-$stamp.tar.gz.gpg" | cut -d ' ' -f 1)"
+          object_key="campus-exchange-backups/database/daily/database-$stamp.tar.gz.gpg"
+          pnpm --dir apps/worker exec wrangler r2 object put "$object_key" --file "../../database-$stamp.tar.gz.gpg" --remote
+          if [ "$(date -u +%u)" = "7" ]; then
+            pnpm --dir apps/worker exec wrangler r2 object put "campus-exchange-backups/database/weekly/database-$stamp.tar.gz.gpg" --file "../../database-$stamp.tar.gz.gpg" --remote
+          fi
+          if [ "$(date -u +%d)" = "01" ]; then
+            pnpm --dir apps/worker exec wrangler r2 object put "campus-exchange-backups/database/monthly/database-$stamp.tar.gz.gpg" --file "../../database-$stamp.tar.gz.gpg" --remote
+          fi
+          pnpm --dir apps/worker exec wrangler r2 object get "$object_key" --file "../../retrieved-$stamp.tar.gz.gpg" --remote
+          echo "$encrypted_digest  retrieved-$stamp.tar.gz.gpg" | sha256sum --check
+          printf '%s' "$BACKUP_ENCRYPTION_PASSWORD" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --decrypt --output "retrieved-$stamp.tar.gz" "retrieved-$stamp.tar.gz.gpg"
+          mkdir restored-backup
+          tar -xzf "retrieved-$stamp.tar.gz" -C restored-backup
+          (cd restored-backup/database-backup && sha256sum --check SHA256SUMS)
+          jq -e --arg commit "$GITHUB_SHA" --arg project_ref "$SUPABASE_PROJECT_REF" '.format_version == 1 and .commit == $commit and .project_ref == $project_ref' restored-backup/database-backup/MANIFEST.json >/dev/null

@@ -1,0 +1,28 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-daily-database-backups",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "database/daily/" },
+      "Expiration": { "Days": 8 }
+    },
+    {
+      "ID": "expire-weekly-database-backups",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "database/weekly/" },
+      "Expiration": { "Days": 56 }
+    },
+    {
+      "ID": "expire-monthly-database-backups",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "database/monthly/" },
+      "Expiration": { "Days": 400 }
+    },
+    {
+      "ID": "abort-incomplete-backup-uploads",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "" },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    }
+  ]
+}

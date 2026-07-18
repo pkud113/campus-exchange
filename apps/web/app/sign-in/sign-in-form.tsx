@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { TurnstileWidget } from "@/components/turnstile-widget";
+import { safeInternalRedirectPath } from "@campus-exchange/contracts";
 
 export function SignInForm({next="/home"}:{next?:string}) {
   const [identifier, setIdentifier] = useState("");
@@ -24,7 +25,7 @@ export function SignInForm({next="/home"}:{next?:string}) {
       body: JSON.stringify({ identifier, password, turnstileToken, next })
     });
     const body = await response.json();
-    if (response.ok) window.location.assign(body.data.next ?? "/home");
+    if (response.ok) window.location.assign(safeInternalRedirectPath(body.data.next) ?? "/home");
     else {
       setError(body.error?.message ?? "Unable to sign in.");
       setTurnstileToken("");
