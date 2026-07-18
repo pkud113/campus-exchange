@@ -1,5 +1,7 @@
 # Campus Exchange
 
+The frozen [V1 architecture](docs/v1-architecture.md), [feature matrix](docs/v1-feature-matrix.md), and [Step 1 implementation plan](docs/v1-step-1-plan.md) define the three-step V1 completion program and its release gates.
+
 Campus Exchange is a verified multi-campus marketplace, events, messaging, and campus-discussions PWA. It is a TypeScript modular monolith built with Next.js, Cloudflare Workers/R2/Images, Supabase PostgreSQL/Auth/Realtime, and a scheduled outbox worker.
 
 The signup directory contains all 6,072 institution records from the official NCES IPEDS HD2024 directory, versioned with its source hash in [`data/institutions/ipeds-hd2024.json`](data/institutions/ipeds-hd2024.json). Directory presence and registration eligibility are separate: 17 colleges have reviewed student-domain mappings with first-party evidence in [`data/college-directory.v1.json`](data/college-directory.v1.json), while other active institutions can collect verified domain-review requests without creating an account or campus. Shared, ambiguous, alumni-only, disabled, and unknown domains fail closed. Listings and events default to campus-only and may be explicitly shared to the network. Discussions remain strictly campus-private.
