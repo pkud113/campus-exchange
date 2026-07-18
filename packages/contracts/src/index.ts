@@ -9,7 +9,26 @@ export const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{
 export const passwordSchema = z.string().min(12).max(72);
 export const loginIdentifierSchema = z.string().trim().min(3).max(254);
 export const turnstileTokenSchema = z.string().max(2048).optional();
-export const registrationStartSchema = z.object({ email: z.string().trim().toLowerCase().email().max(254), turnstileToken: turnstileTokenSchema });
+export const institutionIdSchema = z.string().regex(/^ipeds:[0-9]{6}$/);
+export const institutionSearchSchema = z.object({
+  q: z.string().trim().max(120).default(""),
+  limit: z.coerce.number().int().min(1).max(50).default(20)
+});
+export const registrationStartSchema = z.object({
+  institutionId: institutionIdSchema,
+  email: z.string().trim().toLowerCase().email().max(254),
+  turnstileToken: turnstileTokenSchema
+}).strict();
+export const schoolRequestSchema = z.object({
+  institutionId: institutionIdSchema,
+  email: z.string().trim().toLowerCase().email().max(254),
+  turnstileToken: turnstileTokenSchema
+}).strict();
+export const schoolRequestVerifySchema = z.object({
+  challengeId: uuidSchema,
+  email: z.string().trim().toLowerCase().email().max(254),
+  code: z.string().regex(/^[0-9]{6}$/)
+}).strict();
 export const loginInputSchema = z.object({ identifier: loginIdentifierSchema, password: passwordSchema, turnstileToken: turnstileTokenSchema, next: z.string().max(512).regex(/^\/(?!\/)/).optional() });
 export const onboardingInputSchema = z.object({ username: usernameSchema, password: passwordSchema });
 export const passwordResetStartSchema = z.object({ identifier: loginIdentifierSchema, turnstileToken: turnstileTokenSchema });

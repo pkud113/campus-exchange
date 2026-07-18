@@ -23,6 +23,24 @@ export function normalizeSchoolDomain(email: string): string {
   return email.slice(at + 1).toLowerCase().replace(/\.$/, "");
 }
 
+export type InstitutionRegistrationDecision = "staff" | "approved" | "pending_review" | "mismatch" | "alumni" | "campus_disabled" | "domain_disabled" | "institution_unavailable";
+
+export function decideInstitutionRegistration(input: {
+  staffInvite: boolean;
+  institutionRegistrationStatus: "open" | "suspended" | "closed";
+  selectedCampusId: string | null;
+  resolution: string;
+  resolvedCampusId: string | null;
+}): InstitutionRegistrationDecision {
+  if (input.staffInvite) return "staff";
+  if (input.institutionRegistrationStatus !== "open") return "institution_unavailable";
+  if (input.resolution === "eligible") return input.selectedCampusId && input.selectedCampusId === input.resolvedCampusId ? "approved" : "mismatch";
+  if (input.resolution === "alumni") return "alumni";
+  if (input.resolution === "campus_disabled") return "campus_disabled";
+  if (input.resolution === "domain_disabled") return "domain_disabled";
+  return "pending_review";
+}
+
 export function isVerificationCurrent(verifiedAt: Date, now = new Date()): boolean {
   const expiresAt = new Date(verifiedAt);
   expiresAt.setUTCFullYear(expiresAt.getUTCFullYear() + 1);

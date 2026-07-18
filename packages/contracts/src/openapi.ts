@@ -24,7 +24,10 @@ export const openApiDocument = {
   },
   paths: {
     "/session": { get:{summary:"Get the current session",responses:{"200":{description:"Session state"}}} },
-    "/auth/register/start": { post:{summary:"Send a one-time registration or account-setup code",security:[],responses:{"200":{description:"Code requested"}}} },
+    "/institutions": { get:{summary:"Search the complete NCES IPEDS institution directory",security:[],responses:{"200":{description:"Safe institution search results with registration availability"}}} },
+    "/auth/register/start": { post:{summary:"Confirm the selected institution against an authoritative exact-domain mapping or send a pending-domain ownership code",security:[],responses:{"200":{description:"Approved-domain registration code requested"},"202":{description:"Pending-domain ownership code requested"},"403":{description:"Institution/domain mismatch, alumni domain, or suspended registration"}}} },
+    "/school-requests": { post:{summary:"Send an ownership code before creating an institution-linked domain review request",security:[],responses:{"202":{description:"Ownership code requested"}}} },
+    "/school-requests/verify": { post:{summary:"Verify school-email ownership and atomically create or update a pending domain request without creating an Auth user",security:[],responses:{"202":{description:"Verified request recorded"}}} },
     "/auth/login": { post:{summary:"Sign in with email or username and password",security:[],responses:{"200":{description:"Authenticated"}}} },
     "/auth/onboarding": { post:{summary:"Set immutable username and permanent password",responses:{"200":{description:"Onboarding complete"}}} },
     "/auth/reverify": { post:{summary:"Renew annual student verification after an email OTP",responses:{"200":{description:"Verification renewed or onboarding required"}}} },

@@ -7,10 +7,10 @@ insert into public.campuses(id,name,short_name,slug,timezone,status) values
  ('b0000000-0000-4000-8000-000000000001','Campus Beta','Beta','campus-beta','America/New_York','enabled'),
  ('c0000000-0000-4000-8000-000000000001','Campus Inactive','Inactive','campus-inactive','America/Denver','enabled')
 on conflict do nothing;
-insert into public.campus_email_domains(campus_id,domain,is_enabled) values
- ('00000000-0000-4000-8000-000000000001','alpha.invalid',true),
- ('b0000000-0000-4000-8000-000000000001','beta.invalid',true),
- ('c0000000-0000-4000-8000-000000000001','inactive.invalid',true) on conflict do nothing;
+insert into public.campus_email_domains(campus_id,domain,is_enabled,review_status,domain_kind,source_label,reviewed_at) values
+ ('00000000-0000-4000-8000-000000000001','alpha.invalid',true,'reviewed','student','Synthetic pgTAP fixture',now()),
+ ('b0000000-0000-4000-8000-000000000001','beta.invalid',true,'reviewed','student','Synthetic pgTAP fixture',now()),
+ ('c0000000-0000-4000-8000-000000000001','inactive.invalid',true,'reviewed','student','Synthetic pgTAP fixture',now()) on conflict do nothing;
 insert into auth.users(id,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,aud,role) values
  ('a1000000-0000-4000-8000-000000000001','owner@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated'),
  ('a1000000-0000-4000-8000-000000000002','member@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated'),
