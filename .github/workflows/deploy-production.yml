@@ -36,6 +36,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      DOMAIN_VERIFICATION_SECRET: ${{ secrets.DOMAIN_VERIFICATION_SECRET }}
       WEB_ONLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.web_only == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[web-only]')) }}
     steps:
       - uses: actions/checkout@v7
@@ -54,7 +55,7 @@ jobs:
       - name: Validate deployment credentials
         shell: bash
         run: |
-          required=(NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF SUPABASE_SECRET_KEY TURNSTILE_SECRET_KEY NEXT_PUBLIC_TURNSTILE_SITE_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID RESEND_API_KEY EMAIL_FROM)
+          required=(NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_REF SUPABASE_SECRET_KEY TURNSTILE_SECRET_KEY NEXT_PUBLIC_TURNSTILE_SITE_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID RESEND_API_KEY EMAIL_FROM DOMAIN_VERIFICATION_SECRET)
           for key in "${required[@]}"; do
             if [ -z "${!key}" ]; then
               echo "Missing GitHub production secret: $key" >&2
@@ -158,9 +159,6 @@ jobs:
                 and .mailer_subjects_recovery == "Your Campus Exchange recovery code"
                 and .password_min_length == 12' >/dev/null
 
-      - name: Deploy web application
-        run: pnpm --filter @campus-exchange/web run deploy
-
       - name: Configure web runtime secrets
         shell: bash
         run: |
@@ -170,6 +168,12 @@ jobs:
           printf '%s' "$NEXT_PUBLIC_TURNSTILE_SITE_KEY" | pnpm --dir apps/worker exec wrangler secret put NEXT_PUBLIC_TURNSTILE_SITE_KEY --name campus-exchange-web
           printf '%s' "$TURNSTILE_SECRET_KEY" | pnpm --dir apps/worker exec wrangler secret put TURNSTILE_SECRET_KEY --name campus-exchange-web
           printf '%s' "$APP_ORIGIN" | pnpm --dir apps/worker exec wrangler secret put APP_ORIGIN --name campus-exchange-web
+          printf '%s' "$RESEND_API_KEY" | pnpm --dir apps/worker exec wrangler secret put RESEND_API_KEY --name campus-exchange-web
+          printf '%s' "$EMAIL_FROM" | pnpm --dir apps/worker exec wrangler secret put EMAIL_FROM --name campus-exchange-web
+          printf '%s' "$DOMAIN_VERIFICATION_SECRET" | pnpm --dir apps/worker exec wrangler secret put DOMAIN_VERIFICATION_SECRET --name campus-exchange-web
+
+      - name: Deploy web application
+        run: pnpm --filter @campus-exchange/web run deploy
 
       - name: Configure worker runtime secrets
         if: ${{ env.WEB_ONLY != 'true' }}

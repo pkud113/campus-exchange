@@ -4,8 +4,8 @@ select plan(45);
 
 insert into public.campuses(id,name,short_name,slug,timezone,status) values
   ('00000000-0000-4000-8000-000000000002','Campus Beta','Beta','campus-beta','America/Chicago','enabled') on conflict do nothing;
-insert into public.campus_email_domains(campus_id,domain,is_enabled) values
-  ('00000000-0000-4000-8000-000000000002','students.beta.invalid',true) on conflict do nothing;
+insert into public.campus_email_domains(campus_id,domain,is_enabled,review_status,domain_kind,source_label,reviewed_at) values
+  ('00000000-0000-4000-8000-000000000002','students.beta.invalid',true,'reviewed','student','Synthetic pgTAP fixture',now()) on conflict do nothing;
 
 insert into auth.users(id,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,aud,role) values
   ('10000000-0000-4000-8000-000000000001','owner@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated'),

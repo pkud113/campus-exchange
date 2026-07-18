@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertListingTransition, canCommentInDiscussion, canCreateDirectConversationRequest, canLeaveDiscussion, canManageDiscussionModerators, canManageOwnedContent, canModerateDiscussion, canPostInDiscussion, canRespondToConversationRequest, canTransferDiscussionOwnership, canTransitionListing, discussionCommentDepth, isValidDiscussionSlug, isVerificationCurrent, nextVoteValue, normalizeSchoolDomain, purgeAt, validateDiscussionPost, validatePassword } from "./index";
+import { assertListingTransition, canCommentInDiscussion, canCreateDirectConversationRequest, canLeaveDiscussion, canManageDiscussionModerators, canManageOwnedContent, canModerateDiscussion, canPostInDiscussion, canRespondToConversationRequest, canTransferDiscussionOwnership, canTransitionListing, decideInstitutionRegistration, discussionCommentDepth, isValidDiscussionSlug, isVerificationCurrent, nextVoteValue, normalizeSchoolDomain, purgeAt, validateDiscussionPost, validatePassword } from "./index";
 
 describe("listing lifecycle", () => {
   it("allows the intended forward path", () => expect(canTransitionListing("active", "reserved")).toBe(true));
@@ -64,6 +64,14 @@ describe("discussion rules", () => {
 describe("student verification", () => {
   it("normalizes exact domains", () => expect(normalizeSchoolDomain("Student@School.EDU")).toBe("school.edu"));
   it("expires after one year", () => expect(isVerificationCurrent(new Date("2024-01-01"), new Date("2025-01-02"))).toBe(false));
+  it("requires the approved domain to match the selected institution campus", () => {
+    const base = { staffInvite: false, institutionRegistrationStatus: "open" as const, selectedCampusId: "msu", resolution: "eligible", resolvedCampusId: "msu" };
+    expect(decideInstitutionRegistration(base)).toBe("approved");
+    expect(decideInstitutionRegistration({ ...base, selectedCampusId: "purdue" })).toBe("mismatch");
+    expect(decideInstitutionRegistration({ ...base, resolution: "ambiguous", resolvedCampusId: null })).toBe("pending_review");
+    expect(decideInstitutionRegistration({ ...base, resolution: "alumni", resolvedCampusId: null })).toBe("alumni");
+    expect(decideInstitutionRegistration({ ...base, institutionRegistrationStatus: "suspended" })).toBe("institution_unavailable");
+  });
 });
 
 describe("account foundation", () => {

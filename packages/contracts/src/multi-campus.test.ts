@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campusSelectorSchema, conversationRequestInputSchema, eventInputSchema, listingInputSchema } from "./index";
+import { campusSelectorSchema, conversationRequestInputSchema, eventInputSchema, institutionSearchSchema, listingInputSchema, registrationStartSchema, schoolRequestSchema, schoolRequestVerifySchema } from "./index";
 
 const id="11111111-1111-4111-8111-111111111111";
 const listing={title:"Desk lamp",description:"A useful lamp in good condition",category:"furniture",condition:"good",priceCents:1500,currency:"USD",idempotencyKey:id};
@@ -20,5 +20,15 @@ describe("multi-campus contracts",()=>{
     expect(conversationRequestInputSchema.safeParse({profileId:id,openingMessage:"Hello there",idempotencyKey:id}).success).toBe(true);
     expect(conversationRequestInputSchema.safeParse({profileId:id,openingMessage:"   ",idempotencyKey:id}).success).toBe(false);
     expect(conversationRequestInputSchema.safeParse({profileId:id,openingMessage:"Hello about this listing",idempotencyKey:id,context:{type:"listing",id}}).success).toBe(true);
+  });
+  it("requires a directory institution without accepting a client campus identifier",()=>{
+    const institutionId="ipeds:171100";
+    expect(registrationStartSchema.parse({institutionId,email:"Student@MSU.EDU"})).toEqual({institutionId,email:"student@msu.edu"});
+    expect(schoolRequestSchema.parse({institutionId,email:"Student@Unknown.EDU"})).toEqual({institutionId,email:"student@unknown.edu"});
+    expect(schoolRequestSchema.safeParse({institutionId,email:"student@unknown.edu",campusId:id}).success).toBe(false);
+    expect(registrationStartSchema.safeParse({institutionId,email:"student@msu.edu",campusId:id}).success).toBe(false);
+    expect(registrationStartSchema.safeParse({email:"student@msu.edu"}).success).toBe(false);
+    expect(schoolRequestVerifySchema.safeParse({challengeId:id,email:"student@unknown.edu",code:"123456"}).success).toBe(true);
+    expect(institutionSearchSchema.parse({q:"Michigan",limit:"10"})).toEqual({q:"Michigan",limit:10});
   });
 });

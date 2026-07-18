@@ -2,7 +2,7 @@
 
 ## Release boundary
 
-Production is `https://campus-exchange.net`, the Supabase project is `campus-exchange`, and the Cloudflare Workers are `campus-exchange-web` and `campus-exchange-worker`. Campus and exact-domain activation is operator controlled. Existing campus records retain their prior effective behavior during migration; new campus and domain records default inactive. Staff accounts are invitation-only and may use domains outside the student allowlist.
+Production is `https://campus-exchange.net`, the Supabase project is `campus-exchange`, and the Cloudflare Workers are `campus-exchange-web` and `campus-exchange-worker`. The NCES IPEDS directory makes 6,072 institutions searchable but grants no access by itself. Campus and exact-domain activation remains operator controlled: the reviewed v1 domain set activates its documented 17 colleges transactionally; every later campus/domain defaults inactive or unreviewed. Staff accounts are invitation-only and may use domains outside the student allowlist.
 
 Pushing `main` triggers `.github/workflows/deploy-production.yml`. Keep the GitHub `production` environment protected. Discussions remain private to each verified campus and are never included in cross-campus discovery.
 
@@ -34,6 +34,7 @@ Complete these before the Phase 1 push:
 - `TURNSTILE_SECRET_KEY`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`: `Campus Exchange <access@campus-exchange.net>`
+- `DOMAIN_VERIFICATION_SECRET`: at least 32 random characters, generated independently of Supabase/Resend keys and used only for pending-domain HMACs
 
 Never put secret/service keys in a `NEXT_PUBLIC_` value, a repository file, a screenshot, or browser storage. Rotate any credential that has been exposed.
 
@@ -41,9 +42,9 @@ Never put secret/service keys in a `NEXT_PUBLIC_` value, a repository file, a sc
 
 1. Verify the paid plans, spend caps, backups, DNS, and email-domain status.
 2. Run locally: `supabase db reset`, `supabase db lint --local --schema public,private --level error --fail-on error`, `supabase test db --local supabase/tests`, `pnpm typecheck`, `pnpm test`, `pnpm build`, and `pnpm audit --prod --audit-level high`.
-3. Review all unapplied migrations, including the timestamped Discussions migration, run linked Supabase security/performance advisors, and take the fresh logical backup.
+3. Review all unapplied migrations, `data/institutions/ipeds-hd2024.json`, its pinned source URL/hash/count, and `data/college-directory.v1.json`; confirm every enabled domain still matches its first-party source, run linked Supabase security/performance advisors, and take the fresh logical backup.
 4. Push the reviewed commit to `main` and approve the protected `production` workflow.
-5. The workflow validates credentials, runs verification, ensures R2 exists, deploys the forward-compatible outbox worker, applies additive migrations, configures Supabase Auth, deploys the web Worker, refreshes runtime secrets, and checks apex/`www` health. Do not reverse the worker/migration ordering when new outbox types are present.
+5. The workflow validates credentials, runs verification, ensures R2 exists, deploys the forward-compatible outbox worker, applies additive migrations, configures Supabase Auth, installs the web runtime secrets (including the pending-domain HMAC secret) before the new web code can receive traffic, deploys the web Worker, and checks apex/`www` health. Do not reverse the worker/migration ordering when new outbox types are present.
 6. Confirm the workflow and `/api/health` are green. Confirm public pages load, authenticated responses use `private, no-store`, and the service worker contains no authenticated routes.
 7. Keep `auth_v2_enforced` disabled during the first smoke test. Existing accounts remain usable; new accounts already use the v2 setup flow.
 8. Provision the first administrator and enroll MFA as described below.
@@ -75,15 +76,50 @@ Run all commands from a trusted operator machine with `SUPABASE_URL` and `SUPABA
 
 ```powershell
 pnpm campus:admin -- list
+pnpm campus:admin -- institutions --query "Michigan"
+pnpm campus:admin -- institution --id ipeds:171100 --action status --registration-status open --reviewer operator-id
 pnpm campus:admin -- upsert --campus campus-alpha --name "Campus Alpha" --short-name Alpha --timezone America/Chicago
 pnpm campus:admin -- upsert --campus campus-alpha --name "Campus Alpha" --short-name Alpha --timezone America/Chicago --apply
-pnpm campus:admin -- domain --campus campus-alpha --domain alpha.invalid --action add --apply
+pnpm campus:admin -- institution --id ipeds:123456 --action link --campus campus-alpha --reviewer operator-id --apply
+pnpm campus:admin -- domain --campus campus-alpha --institution ipeds:123456 --domain students.alpha.edu --action add --apply
+pnpm campus:admin -- domain --campus campus-alpha --institution ipeds:123456 --domain students.alpha.edu --action review --kind student --source-url "https://alpha.edu/official-student-email-policy" --reviewer operator-id --confidence high --apply
+pnpm campus:admin -- domain --campus campus-alpha --domain students.alpha.edu --action enable --apply
 pnpm campus:admin -- status --campus campus-alpha --status enabled
 pnpm campus:admin -- status --campus campus-alpha --status enabled --apply
 pnpm campus:admin -- list
 ```
 
-Campus creation never activates a campus. Enabling requires at least one enabled exact domain. Disabling or removing the last enabled domain is refused unless `--confirm-last-domain` is explicitly supplied. Suspending/disabled campuses immediately fail active-member checks and disappear from network discovery; do not use that control without reviewing active-user impact.
+Campus creation never activates a campus. `domain --action add` creates an unreviewed, disabled mapping; review requires a qualifying kind and official HTTPS source, and enable remains a separate action. Enabling a campus requires at least one reviewed qualifying enabled exact domain. The database prevents two campuses from enabling the same exact domain. Disabling or removing the last enabled domain is refused unless `--confirm-last-domain` is explicitly supplied. Suspending/disabled campuses immediately fail active-member checks and disappear from network discovery; do not use that control without reviewing active-user impact.
+
+### Institution and verified-domain review
+
+Registration requires an IPEDS institution selection plus a school email. The selection is never authoritative. Reviewed exact-domain matches receive the normal Supabase registration OTP; every other eligible institution receives a separate ten-minute ownership code through Resend. Completion stores an HMAC of the address, the normalized domain, and institution ID. It creates no Auth user, profile, campus, or domain mapping.
+
+Review verified demand from a trusted operator machine:
+
+```powershell
+pnpm campus:admin -- domain-requests --status pending
+pnpm campus:admin -- domain-request --id <request-uuid> --action review --reviewer operator-id --confidence medium
+pnpm campus:admin -- domain-request --id <request-uuid> --action review --reviewer operator-id --confidence medium --apply
+```
+
+Research the exact student address using an official institution IT, registrar, admissions, catalog, or student-policy page. IPEDS confirms institution identity, not email domains. For an institution without a linked campus, create one disabled campus and link the existing directory record; do not create a duplicate institution:
+
+```powershell
+pnpm campus:admin -- upsert --campus example-state-university --name "Example State University" --short-name "Example State" --timezone America/Chicago --city Example --region IL --apply
+pnpm campus:admin -- institution --id ipeds:123456 --action link --campus example-state-university --reviewer operator-id --apply
+pnpm campus:admin -- domain-request --id <request-uuid> --action approve --campus example-state-university --kind student --source-url "https://example.edu/official-student-email-policy" --reviewer operator-id --confidence high
+pnpm campus:admin -- domain-request --id <request-uuid> --action approve --campus example-state-university --kind student --source-url "https://example.edu/official-student-email-policy" --reviewer operator-id --confidence high --apply
+pnpm campus:admin -- domain --campus example-state-university --domain students.example.edu --action enable --apply
+pnpm campus:admin -- status --campus example-state-university --status enabled --apply
+pnpm campus:admin -- list
+```
+
+`--enable-domain` may be added to approval only after collision/shared-campus review; campus activation remains separate. Mark shared physical-campus domains with `domain --action review --kind shared`, alumni domains with `--kind alumni`, and rejected evidence with `--action reject`. None can be enabled. Use `domain-request --action duplicate|reject` with non-sensitive notes. Merge duplicate directory identities atomically with `institution --id ipeds:SOURCE --action duplicate --into ipeds:CANONICAL --reviewer operator-id --apply`. Suspend request/registration intake with `institution --action status --registration-status suspended`; this also prevents already approved student registration through that directory selection. All mutations audit evidence metadata but must never log full emails, codes, credentials, or private student data.
+
+### IPEDS refresh
+
+Download a newer official `HD<year>.zip` only from the NCES IPEDS Data Center. Do not replace the pinned artifact silently. Review dictionary/lifecycle changes, update the importer year, expected row count, and SHA-256, run it against the extracted CSV, inspect added/removed/renamed/merged records, and create a new forward migration. Preserve old UNITIDs and operator links; mark disappeared records inactive/merged rather than deleting them. Run the complete reset, pgTAP, lint, advisors, typecheck, tests, build, and dry-run deployment before approval.
 
 Recommended runtime defaults are `network_features_enabled=true`, `message_request_daily_limit=10` per rolling 24 hours, `message_request_decline_cooldown_days=14`, and `blocked_conversation_visibility=read_only`. These are operational defaults, not permanent product constants:
 
@@ -98,7 +134,7 @@ Platform moderation is separate from campus administration and still requires an
 
 ## Production smoke and isolation checklist
 
-- Registration: enabled campus plus enabled exact school domain, six-digit code, immutable username/campus assignment, 12-character password, inactive-domain rejection, and duplicate username rejection.
+- Registration: search active, closed, merged, Michigan, and Purdue directory entries; test MSU plus several reviewed launch domains; verify wrong-college mismatch, alumni/disabled rejection, shared-domain pending routing, ownership-code expiry/replay, no Auth user for pending requests, immutable server-derived campus assignment, and duplicate username rejection.
 - Existing account: one final OTP, retained username, password setup, then username/email login.
 - Recovery: identical start response for known/unknown identifiers, six-digit recovery code, new password, other sessions revoked.
 - Session isolation: account A signs in, views profile/messages, logs out, account B signs in in the same browser, Back is used, and no account-A HTML/API/message data appears. Inspect Cache Storage to confirm only public shell assets exist.
