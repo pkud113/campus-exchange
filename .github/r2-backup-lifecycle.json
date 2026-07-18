@@ -1,28 +1,28 @@
 {
-  "Rules": [
+  "rules": [
     {
-      "ID": "expire-daily-database-backups",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "database/daily/" },
-      "Expiration": { "Days": 8 }
+      "id": "expire-daily-database-backups",
+      "enabled": true,
+      "conditions": { "prefix": "database/daily/" },
+      "deleteObjectsTransition": { "condition": { "type": "Age", "maxAge": 691200 } }
     },
     {
-      "ID": "expire-weekly-database-backups",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "database/weekly/" },
-      "Expiration": { "Days": 56 }
+      "id": "expire-weekly-database-backups",
+      "enabled": true,
+      "conditions": { "prefix": "database/weekly/" },
+      "deleteObjectsTransition": { "condition": { "type": "Age", "maxAge": 4838400 } }
     },
     {
-      "ID": "expire-monthly-database-backups",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "database/monthly/" },
-      "Expiration": { "Days": 400 }
+      "id": "expire-monthly-database-backups",
+      "enabled": true,
+      "conditions": { "prefix": "database/monthly/" },
+      "deleteObjectsTransition": { "condition": { "type": "Age", "maxAge": 34560000 } }
     },
     {
-      "ID": "abort-incomplete-backup-uploads",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "" },
-      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+      "id": "abort-incomplete-backup-uploads",
+      "enabled": true,
+      "conditions": {},
+      "abortMultipartUploadsTransition": { "condition": { "type": "Age", "maxAge": 604800 } }
     }
   ]
 }
