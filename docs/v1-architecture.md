@@ -34,7 +34,7 @@ The repository is a pnpm TypeScript modular monolith:
 - `data`: versioned institution and reviewed-domain source data.
 - `.github/workflows`: reset, lint, pgTAP, TypeScript, ESLint, unit, build, Playwright, audit, backup, and deployment gates.
 
-Current complete or substantially complete verticals are authentication/onboarding, reviewed institution registration, marketplace, events, cross-campus discovery, message requests and messaging, notifications/preferences, discussions, blocking/reporting, staff moderation, private media, outbox delivery, and operational controls. Friends, organizations, social posts, unified search, expanded profiles, and the mobile-ready shared package surface are not yet implemented.
+At the architecture freeze, complete or substantially complete verticals were authentication/onboarding, reviewed institution registration, marketplace, events, cross-campus discovery, message requests and messaging, notifications/preferences, discussions, blocking/reporting, staff moderation, private media, outbox delivery, and operational controls. Step 1 has since added the secure foundations for friends, organizations, social posts, unified search, expanded profiles, notification categories, and the mobile-ready shared package surface; the feature matrix records their verified readiness and remaining Step 2 UX work.
 
 ## Target repository architecture
 
@@ -237,4 +237,3 @@ V1 targets WCAG 2.2 AA. All functions must be keyboard operable with a visible `
 8. Security-definer code isolated in unexposed schemas with empty search paths and explicit grants.
 9. Append-only moderation/audit data and idempotent outbox delivery.
 10. Reset, lint, pgTAP/RLS, type, lint, unit, build, Playwright, and dependency-audit release gates.
-

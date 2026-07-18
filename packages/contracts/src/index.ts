@@ -125,7 +125,7 @@ export const messageInputSchema = z.object({
 });
 
 export const reportInputSchema = z.object({
-  targetType: z.enum(["listing", "event", "profile", "message", "conversation_request", "community", "discussion_post", "discussion_comment"]),
+  targetType: z.enum(["listing", "event", "profile", "message", "conversation_request", "community", "discussion_post", "discussion_comment", "organization", "social_post", "social_comment"]),
   targetId: uuidSchema,
   reason: z.enum(["fraud", "harassment", "prohibited_item", "spam", "unsafe", "other"]),
   details: z.string().trim().max(2000).default(""),
@@ -150,7 +150,7 @@ export const conversationRequestInputSchema = z.object({
 });
 export const conversationRequestResponseSchema = z.object({ response: z.enum(["accepted", "declined"]) });
 export const contentDeletionSchema = z.object({ reason: z.string().trim().min(3).max(1000).default("User deleted content") });
-export const mediaPurposeSchema = z.enum(["listing", "avatar", "banner", "community_icon", "community_banner", "discussion_post"]);
+export const mediaPurposeSchema = z.enum(["listing", "avatar", "banner", "community_icon", "community_banner", "discussion_post", "organization_avatar", "organization_banner", "social_post"]);
 
 export const discussionSlugSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,32}$/);
 export const discussionPostingPermissionSchema = z.enum(["members", "moderators", "owner"]);
@@ -350,7 +350,7 @@ export const organizationInputSchema = z.object({
   idempotencyKey: uuidSchema,
 }).strict();
 export const organizationMembershipInputSchema = z.object({
-  action: z.enum(["request", "invite", "accept", "decline", "cancel", "remove", "ban", "unban", "change_role"]),
+  action: z.enum(["request", "invite", "accept", "decline", "cancel", "remove", "ban", "unban", "change_role", "transfer_ownership"]),
   profileId: uuidSchema.optional(),
   role: organizationRoleSchema.optional(),
   idempotencyKey: uuidSchema,

@@ -17,6 +17,11 @@ type Props = {
     username: string;
     displayName: string;
     bio: string;
+    academicField: string;
+    graduationYear: number | null;
+    graduationYearVisible: boolean;
+    interests: string[];
+    visibility: "campus_only" | "network" | "friends" | "private";
     verifiedUntil: string;
     avatarId: string | null;
     bannerId: string | null;
@@ -56,7 +61,12 @@ export function ProfileSettings({ profile, isStaff }: Props) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         displayName: form.get("displayName"),
-        bio: form.get("bio"),
+        biography: form.get("bio"),
+        academicField: form.get("academicField") || null,
+        graduationYear: form.get("graduationYear") ? Number(form.get("graduationYear")) : null,
+        graduationYearVisible: form.get("graduationYearVisible") === "on",
+        interests: String(form.get("interests") ?? "").split(",").map((value) => value.trim()).filter(Boolean),
+        visibility: form.get("visibility"),
       }),
     });
     const body = await response.json();
@@ -200,8 +210,27 @@ export function ProfileSettings({ profile, isStaff }: Props) {
           </label>
           <label>
             Bio
-            <textarea name="bio" rows={4} defaultValue={profile.bio} maxLength={500} />
+            <textarea name="bio" rows={4} defaultValue={profile.bio} maxLength={1000} />
           </label>
+          <div className="form-grid">
+            <label>
+              Academic field
+              <input name="academicField" defaultValue={profile.academicField} minLength={2} maxLength={120} placeholder="Computer Science" />
+            </label>
+            <label>
+              Graduation year
+              <input name="graduationYear" type="number" min={1900} max={2200} defaultValue={profile.graduationYear ?? ""} />
+            </label>
+            <label className="full">
+              Interests <small>Separate up to 20 interests with commas.</small>
+              <input name="interests" defaultValue={profile.interests.join(", ")} maxLength={800} placeholder="robotics, accessibility, hiking" />
+            </label>
+            <label>
+              Profile audience
+              <select name="visibility" defaultValue={profile.visibility}><option value="campus_only">My campus</option><option value="network">Campus Exchange network</option><option value="friends">Friends</option><option value="private">Only me</option></select>
+            </label>
+            <label className="checkbox-label"><input name="graduationYearVisible" type="checkbox" defaultChecked={profile.graduationYearVisible}/> Show graduation year</label>
+          </div>
           {notice && (
             <p className="form-notice" role="status">
               {notice}

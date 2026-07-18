@@ -2,6 +2,7 @@
 
 import {
   Bell,
+  Building2,
   CalendarDays,
   ChevronRight,
   CirclePlus,
@@ -11,6 +12,7 @@ import {
   Menu,
   MessageCircle,
   MessageSquareText,
+  Newspaper,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -19,6 +21,7 @@ import {
   ShoppingBag,
   Store,
   UserRound,
+  UserRoundCheck,
   UsersRound,
   X,
   type LucideIcon,
@@ -216,6 +219,9 @@ export function AppNavigation({
 
   const homeEntry: NavEntry = { href: "/home", label: "Home", Icon: Home };
   const marketplaceEntry: NavEntry = { href: "/marketplace", label: "Marketplace", Icon: Store };
+  const socialEntry: NavEntry = { href: "/social", label: "Social", Icon: Newspaper };
+  const organizationsEntry: NavEntry = { href: "/organizations", label: "Organizations", Icon: Building2 };
+  const friendsEntry: NavEntry = { href: "/friends", label: "Friends", Icon: UserRoundCheck };
   const discussionsEntry: NavEntry = { href: "/discussions", label: "Discussions", Icon: MessageSquareText };
   const eventsEntry: NavEntry = { href: "/events", label: "Events", Icon: CalendarDays };
   const peopleEntry: NavEntry = { href: "/people", label: "People", Icon: UsersRound };
@@ -224,20 +230,23 @@ export function AppNavigation({
   const main: NavEntry[] = [
     homeEntry,
     marketplaceEntry,
-    ...(discussionsEnabled ? [discussionsEntry] : []),
+    socialEntry,
+    organizationsEntry,
     eventsEntry,
-    peopleEntry,
+    ...(discussionsEnabled ? [discussionsEntry] : []),
     messagesEntry,
-    notificationsEntry,
   ];
   const mobile: NavEntry[] = [
     homeEntry,
     marketplaceEntry,
-    ...(discussionsEnabled ? [discussionsEntry] : []),
+    socialEntry,
     eventsEntry,
     messagesEntry,
   ];
   const management: NavEntry[] = [
+    peopleEntry,
+    friendsEntry,
+    notificationsEntry,
     { href: "/my/listings", label: "My listings", Icon: ShoppingBag },
     { href: "/my/events", label: "My events", Icon: ListChecks },
     { href: "/sell", label: "Create listing", Icon: CirclePlus },
@@ -356,7 +365,7 @@ export function AppNavigation({
       <header className="mobile-header">
         <Brand />
         <div className="mobile-header-actions">
-          <Link href={discussionsEnabled ? "/discussions" : "/marketplace"} aria-label={discussionsEnabled ? "Search discussions" : "Search marketplace"}><Search /></Link>
+          <Link href="/search" aria-label="Search Campus Exchange"><Search /></Link>
           <Link className="mobile-alert-link" href="/notifications" aria-label="Notifications">
             <Bell />
             {notificationCount > 0 && <span className="nav-badge">{formatCount(notificationCount)}</span>}
@@ -396,7 +405,7 @@ export function AppNavigation({
               <ChevronRight aria-hidden="true" />
             </Link>
             <nav aria-label="More destinations">
-              <NavSection label="Discover" entries={[peopleEntry, notificationsEntry]} path={path} onNavigate={closeMenu} />
+              <NavSection label="Discover" entries={[peopleEntry, organizationsEntry, friendsEntry, notificationsEntry]} path={path} onNavigate={closeMenu} />
               <NavSection label="Management" entries={management} path={path} onNavigate={closeMenu} />
               <NavSection label="Account" entries={account} path={path} onNavigate={closeMenu} />
             </nav>

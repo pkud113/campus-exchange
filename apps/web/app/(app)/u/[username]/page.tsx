@@ -6,6 +6,7 @@ import { MessageRequestComposer } from "@/components/message-request-composer";
 import { UserAvatar } from "@/components/user-avatar";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BlockButton } from "./block-button";
+import { FriendRequestButton } from "@/components/friend-request-button";
 
 export default async function PublicProfile({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
@@ -32,9 +33,10 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
       <div className="public-profile-heading">
         <UserAvatar name={displayName} mediaId={profile.avatar_media_id} size="profile" />
         <div><h1>{displayName}</h1><p>@{profile.handle} · {profile.campus_name}</p><small>Joined {new Date(profile.joined_month).toLocaleDateString(undefined,{month:"long",year:"numeric"})}</small></div>
-        {!own ? <div className="profile-actions"><MessageRequestComposer profileId={profile.id} username={profile.handle} campus={profile.campus_name} /><BlockButton profileId={profile.id} initialBlocked={(blockCount??0)>0}/></div> : <Link className="button button-ghost" href="/settings">Edit profile</Link>}
+        {!own ? <div className="profile-actions"><FriendRequestButton profileId={profile.id}/><MessageRequestComposer profileId={profile.id} username={profile.handle} campus={profile.campus_name} /><BlockButton profileId={profile.id} initialBlocked={(blockCount??0)>0}/></div> : <Link className="button button-ghost" href="/settings">Edit profile</Link>}
       </div>
       {profile.bio && <p className="profile-bio">{profile.bio}</p>}
+      <div className="profile-details">{profile.academic_field&&<span><strong>Academic field</strong>{profile.academic_field}</span>}{profile.graduation_year&&<span><strong>Graduation</strong>{profile.graduation_year}</span>}{profile.interests?.length>0&&<span className="profile-interests"><strong>Interests</strong>{profile.interests.map((interest:string)=><i key={interest}>{interest}</i>)}</span>}</div>
     </section>
     <section className="content-section"><div className="section-heading"><div><span className="overline">LISTINGS</span><h2>{displayName} is selling</h2></div><ShoppingBag/></div>
       {listings?.length ? <div className="listing-grid">{listings.map((item) => <ListingCard key={item.id} listing={{...item,profiles:seller,media_uploads:(listingMedia??[]).filter((media:any)=>media.listing_id===item.id)} as never} initialFavorite={favoriteIds.has(item.id)}/>)}</div> : <div className="empty-state"><ShoppingBag/><p>No active listings available to you.</p></div>}

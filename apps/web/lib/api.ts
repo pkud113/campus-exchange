@@ -110,6 +110,16 @@ export async function enforceRateLimit(request: Request, scope: string, subject:
   return null;
 }
 
+export function mutationError(request: Request, error: { code?: string; message?: string } | null, fallback: string) {
+  if (!error) return apiError(request, 500, "internal_error", fallback);
+  if (error.code === "23505") return apiError(request, 409, "conflict", "That action conflicts with the current state.");
+  if (error.code === "P0002") return apiError(request, 404, "not_found", "That resource is unavailable.");
+  if (error.code === "42501") return apiError(request, 403, "forbidden", "That action is not allowed.");
+  if (error.code === "23514" || error.code === "22P02") return apiError(request, 400, "bad_request", fallback);
+  console.error(JSON.stringify({ level: "error", event: "mutation_failed", requestId: requestId(request), code: error.code }));
+  return apiError(request, 500, "internal_error", fallback);
+}
+
 export async function enforceRateLimits(request: Request, buckets: Array<{ scope: string; subject: string; limit: number; windowSeconds: number }>): Promise<NextResponse | null> {
   for (const bucket of buckets) {
     const result = await enforceRateLimit(request, bucket.scope, bucket.subject, bucket.limit, bucket.windowSeconds);

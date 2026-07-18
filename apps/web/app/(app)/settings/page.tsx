@@ -14,7 +14,7 @@ export default async function Settings() {
     db
       .from("profiles")
       .select(
-        "handle,display_name,bio,verified_until,avatar_media_id,banner_media_id",
+        "handle,display_name,bio,academic_field,graduation_year,graduation_year_visible,interests,profile_visibility,verified_until,avatar_media_id,banner_media_id",
       )
       .eq("id", user.id)
       .single(),
@@ -29,6 +29,11 @@ export default async function Settings() {
           username: profile?.handle ?? "",
           displayName: profile?.display_name ?? profile?.handle ?? "",
           bio: profile?.bio ?? "",
+          academicField: profile?.academic_field ?? "",
+          graduationYear: profile?.graduation_year ?? null,
+          graduationYearVisible: profile?.graduation_year_visible ?? false,
+          interests: profile?.interests ?? [],
+          visibility: profile?.profile_visibility ?? "campus_only",
           verifiedUntil: profile?.verified_until ?? "",
           avatarId: profile?.avatar_media_id ?? null,
           bannerId: profile?.banner_media_id ?? null,

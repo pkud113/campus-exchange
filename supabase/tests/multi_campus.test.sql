@@ -16,7 +16,7 @@ insert into auth.users(id,email,encrypted_password,email_confirmed_at,raw_app_me
  ('a1000000-0000-4000-8000-000000000002','member@alpha.invalid','test',now(),'{}','{}','authenticated','authenticated'),
  ('b1000000-0000-4000-8000-000000000001','owner@beta.invalid','test',now(),'{}','{}','authenticated','authenticated'),
  ('c1000000-0000-4000-8000-000000000001','inactive@inactive.invalid','test',now(),'{}','{}','authenticated','authenticated');
-update public.profiles set status='active',onboarding_completed_at=now(),password_setup_required=false,verified_until=now()+interval '1 year',handle=case id
+update public.profiles set status='active',onboarding_completed_at=now(),password_setup_required=false,verified_until=now()+interval '1 year',profile_visibility=case when id='b1000000-0000-4000-8000-000000000001' then 'network'::public.profile_visibility else 'campus_only'::public.profile_visibility end,handle=case id
  when 'a1000000-0000-4000-8000-000000000001' then 'alpha_owner' when 'a1000000-0000-4000-8000-000000000002' then 'alpha_member'
  when 'b1000000-0000-4000-8000-000000000001' then 'beta_owner' else 'inactive_member' end where id::text like '_1000000-%';
 update public.campuses set status='disabled' where id='c0000000-0000-4000-8000-000000000001';

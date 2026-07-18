@@ -15,16 +15,18 @@ const schema = z
   .object({
     listingId: z.string().uuid().optional(),
     communitySlug: z.string().regex(/^[a-z0-9_]{3,32}$/).optional(),
-    purpose: z.enum(["listing", "avatar", "banner", "community_icon", "community_banner", "discussion_post"]).default("listing"),
+    organizationId: z.string().uuid().optional(),
+    purpose: z.enum(["listing", "avatar", "banner", "community_icon", "community_banner", "discussion_post", "organization_avatar", "organization_banner", "social_post"]).default("listing"),
     contentType: z.enum(listingImageTypes),
     byteSize: z.number().int().min(1).max(maxImageBytes),
     altText: z.string().trim().max(300).default(""),
   })
   .refine(
     (value) => {
-      if (value.purpose === "listing") return Boolean(value.listingId) && !value.communitySlug;
-      if (value.purpose === "community_icon" || value.purpose === "community_banner") return Boolean(value.communitySlug) && !value.listingId;
-      return !value.listingId && !value.communitySlug;
+      if (value.purpose === "listing") return Boolean(value.listingId) && !value.communitySlug && !value.organizationId;
+      if (value.purpose === "community_icon" || value.purpose === "community_banner") return Boolean(value.communitySlug) && !value.listingId && !value.organizationId;
+      if (value.purpose === "organization_avatar" || value.purpose === "organization_banner") return Boolean(value.organizationId) && !value.listingId && !value.communitySlug;
+      return !value.listingId && !value.communitySlug && !value.organizationId;
     },
     { message: "Upload target does not match its purpose" },
   );
@@ -46,6 +48,8 @@ export async function POST(request: Request) {
   if (input instanceof NextResponse) return input;
 
   const admin = createSupabaseAdminClient();
+  let mediaCampusId = context.campusId;
+  let organizationId: string | null = null;
   if (input.purpose === "listing") {
     const { data: listing } = await context.supabase
       .from("listings")
@@ -94,15 +98,36 @@ export async function POST(request: Request) {
       return apiError(request, 403, "forbidden", "Only the community owner can upload community media.");
     }
   }
+  if (input.purpose === "organization_avatar" || input.purpose === "organization_banner") {
+    const [{ data: membership }, { data: organization }] = await Promise.all([
+      context.supabase
+        .from("organization_memberships")
+        .select("role,status")
+        .eq("organization_id", input.organizationId!)
+        .eq("profile_id", context.userId)
+        .single(),
+      context.supabase
+        .from("organizations")
+        .select("id,campus_id,status")
+        .eq("id", input.organizationId!)
+        .single(),
+    ]);
+    if (!membership || membership.status !== "active" || !["owner", "administrator"].includes(membership.role) || !organization || organization.status !== "active") {
+      return apiError(request, 403, "forbidden", "Organization administrators manage organization media.");
+    }
+    organizationId = organization.id;
+    mediaCampusId = organization.campus_id;
+  }
 
   const id = crypto.randomUUID();
-  const objectKey = `${context.campusId}/${context.userId}/${input.purpose}/${id}`;
+  const objectKey = `${mediaCampusId}/${context.userId}/${input.purpose}/${id}`;
   const { error } = await admin.from("media_uploads").insert({
     id,
-    campus_id: context.campusId,
+    campus_id: mediaCampusId,
     uploader_id: context.userId,
     listing_id: input.purpose === "listing" ? input.listingId : null,
     profile_id: input.purpose === "avatar" || input.purpose === "banner" ? context.userId : null,
+    organization_id: organizationId,
     purpose: input.purpose,
     object_key: objectKey,
     content_type: input.contentType,

@@ -39,6 +39,19 @@ describe("worker delivery helpers", () => {
     expect(interactionNotificationCopy("event.rsvp_created",{eventId:"22222222-2222-2222-2222-222222222222"})?.href).toBe("/events?event=22222222-2222-2222-2222-222222222222");
     expect(interactionNotificationCopy("moderation.report_resolved",{})?.href).toBe("/notifications");
   });
+  it.each([
+    ["friend.requested", "friend_request", "/friends?tab=incoming"],
+    ["friend.accepted", "friend_accepted", "/friends"],
+    ["organization.invited", "organization_invitation", "/organizations/robotics-club"],
+    ["social.reacted", "social_reaction", "/social?post=11111111-1111-1111-1111-111111111111"],
+    ["social.commented", "social_comment", "/social?post=11111111-1111-1111-1111-111111111111"],
+    ["social.replied", "social_reply", "/social?post=11111111-1111-1111-1111-111111111111"],
+  ])("maps %s to a typed, internal notification", (eventType, category, href) => {
+    const copy = interactionNotificationCopy(eventType, { organizationSlug: "robotics-club", postId: "11111111-1111-1111-1111-111111111111" });
+    expect(copy?.category).toBe(category);
+    expect(copy?.href).toBe(href);
+    expect(JSON.stringify(copy)).not.toMatch(/email|credential|message body/i);
+  });
   it("honors email categories and overnight quiet hours", () => {
     const overnight = { email_messages: true, email_discussions: false, quiet_hours_start: 22, quiet_hours_end: 7 };
     expect(notificationEmailAllowed(overnight, "messages", new Date("2026-01-01T23:00:00Z"))).toBe(false);

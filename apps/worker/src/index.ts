@@ -41,6 +41,11 @@ const discussionEventTypes = new Set([
   "discussion.remove_post", "discussion.remove_comment", "discussion.remove_community", "discussion.ownership_transferred"
 ]);
 
+const interactionEventTypes = new Set([
+  "conversation_request.created", "conversation_request.accepted", "event.rsvp_created", "moderation.report_resolved",
+  "friend.requested", "friend.accepted", "organization.invited", "social.reacted", "social.commented", "social.replied",
+]);
+
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const communitySlugPattern = /^[a-z0-9_]{3,32}$/;
 
@@ -49,10 +54,16 @@ export function messageNotificationHref(conversationId: string) {
 }
 
 export function interactionNotificationCopy(eventType:string,payload:Record<string,string>){
-  if(eventType==="conversation_request.created")return{title:"New message request",body:"A verified Campus Exchange member sent you a message request.",href:"/messages?view=incoming"};
-  if(eventType==="conversation_request.accepted")return{title:"Message request accepted",body:"Your message request was accepted.",href:messageNotificationHref(payload.conversationId??"")};
-  if(eventType==="event.rsvp_created")return{title:"New event RSVP",body:"A verified member RSVP’d to your event.",href:uuid.test(payload.eventId??"")?`/events?event=${payload.eventId}`:"/events"};
-  if(eventType==="moderation.report_resolved")return{title:"Report reviewed",body:"A moderation team reviewed a report you submitted.",href:"/notifications"};
+  if(eventType==="conversation_request.created")return{kind:"message_request",category:"message_request",title:"New message request",body:"A verified Campus Exchange member sent you a message request.",href:"/messages?view=incoming"};
+  if(eventType==="conversation_request.accepted")return{kind:"message_request",category:"message_request",title:"Message request accepted",body:"Your message request was accepted.",href:messageNotificationHref(payload.conversationId??"")};
+  if(eventType==="event.rsvp_created")return{kind:"event",category:"event_activity",title:"New event RSVP",body:"A verified member RSVP'd to your event.",href:uuid.test(payload.eventId??"")?`/events?event=${payload.eventId}`:"/events"};
+  if(eventType==="moderation.report_resolved")return{kind:"moderation",category:"moderation_activity",title:"Report reviewed",body:"A moderation team reviewed a report you submitted.",href:"/notifications"};
+  if(eventType==="friend.requested")return{kind:"friend_request",category:"friend_request",title:"New friend request",body:"A verified student sent you a friend request.",href:"/friends?tab=incoming"};
+  if(eventType==="friend.accepted")return{kind:"friend_accepted",category:"friend_accepted",title:"Friend request accepted",body:"You are now friends.",href:"/friends"};
+  if(eventType==="organization.invited")return{kind:"organization_invitation",category:"organization_invitation",title:"Organization invitation",body:"You were invited to join an organization.",href:/^[a-z0-9][a-z0-9-]{2,62}$/.test(payload.organizationSlug??"")?`/organizations/${payload.organizationSlug}`:"/organizations"};
+  if(eventType==="social.reacted")return{kind:"social_reaction",category:"social_reaction",title:"New reaction",body:"A verified student reacted to your post.",href:uuid.test(payload.postId??"")?`/social?post=${payload.postId}`:"/social"};
+  if(eventType==="social.commented")return{kind:"social_comment",category:"social_comment",title:"New comment",body:"A verified student commented on your post.",href:uuid.test(payload.postId??"")?`/social?post=${payload.postId}`:"/social"};
+  if(eventType==="social.replied")return{kind:"social_reply",category:"social_reply",title:"New reply",body:"A verified student replied to your comment.",href:uuid.test(payload.postId??"")?`/social?post=${payload.postId}`:"/social"};
   return null;
 }
 
@@ -143,8 +154,7 @@ async function deliverInteractionEvent(db:SupabaseClient,event:OutboxEvent){
   if(actorId&&actorId===recipientId)return;
   if(actorId){const{data:blocked,error}=await db.from("blocks").select("blocker_id").or(`and(blocker_id.eq.${recipientId},blocked_id.eq.${actorId}),and(blocker_id.eq.${actorId},blocked_id.eq.${recipientId})`).maybeSingle();if(error)throw error;if(blocked)return;}
   const notificationId=await deterministicNotificationId(event.id,recipientId);
-  const kind=event.event_type==="event.rsvp_created"?"event":event.event_type==="moderation.report_resolved"?"moderation":"message_request";
-  const{error}=await db.from("notifications").upsert({id:notificationId,campus_id:event.campus_id,profile_id:recipientId,source_event_id:event.id,kind,title:copy.title,body:copy.body,href:copy.href},{onConflict:"id"});if(error)throw error;
+  const{error}=await db.from("notifications").upsert({id:notificationId,campus_id:event.campus_id,profile_id:recipientId,source_event_id:event.id,kind:copy.kind,category:copy.category,title:copy.title,body:copy.body,href:copy.href},{onConflict:"id"});if(error)throw error;
 }
 
 async function deliverDiscussionEvent(db: SupabaseClient, event: OutboxEvent, env: Env) {
@@ -197,7 +207,7 @@ async function deliverDiscussionEvent(db: SupabaseClient, event: OutboxEvent, en
 
 async function processEvent(db: SupabaseClient, event: OutboxEvent, env: Env) {
   if (event.event_type === "message.created") return event.payload.requestId ? undefined : deliverMessageCreated(db, event, env);
-  if (["conversation_request.created","conversation_request.accepted","event.rsvp_created","moderation.report_resolved"].includes(event.event_type)) return deliverInteractionEvent(db,event);
+  if (interactionEventTypes.has(event.event_type)) return deliverInteractionEvent(db,event);
   if (discussionEventTypes.has(event.event_type)) return deliverDiscussionEvent(db, event, env);
   throw new Error(`unsupported outbox event: ${event.event_type}`);
 }
@@ -257,7 +267,7 @@ async function runMaintenance(env: Env) {
   }).lte("purge_after", now).is("purged_at", null);
   if (communityPurgeError) throw communityPurgeError;
   const abandonedMediaCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: discussionMedia, error: discussionMediaError } = await db.from("media_uploads").select("id,object_key").in("purpose", ["community_icon", "community_banner", "discussion_post"]).eq("status", "ready").is("attached_at", null).lt("created_at", abandonedMediaCutoff).limit(100);
+  const { data: discussionMedia, error: discussionMediaError } = await db.from("media_uploads").select("id,object_key").in("purpose", ["community_icon", "community_banner", "discussion_post", "organization_avatar", "organization_banner", "social_post"]).eq("status", "ready").is("attached_at", null).lt("created_at", abandonedMediaCutoff).limit(100);
   if (discussionMediaError) throw discussionMediaError;
   for (const item of discussionMedia ?? []) {
     await env.MEDIA_BUCKET.delete(item.object_key);

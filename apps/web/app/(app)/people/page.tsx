@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MessageRequestComposer } from "@/components/message-request-composer";
 import { PageHeader } from "@/components/ui";
 import { UserAvatar } from "@/components/user-avatar";
+import { FriendRequestButton } from "@/components/friend-request-button";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "People" };
@@ -34,7 +35,7 @@ export default async function People({ searchParams }: { searchParams: Promise<{
             <article className="person-card" key={person.id}>
               <UserAvatar name={person.display_name ?? person.handle} mediaId={person.avatar_media_id} size="large" />
               <div><Link href={`/u/${person.handle}`}><strong>{person.display_name ?? person.handle}</strong></Link><span>@{person.handle}</span><small>{person.campus_short_name ?? person.campus_name} · Joined {new Date(person.joined_month).toLocaleDateString(undefined,{month:"short",year:"numeric"})}</small></div>
-              <MessageRequestComposer profileId={person.id} username={person.handle} campus={person.campus_name} label="Message" />
+              <div className="person-actions"><FriendRequestButton profileId={person.id}/><MessageRequestComposer profileId={person.id} username={person.handle} campus={person.campus_name} label="Message" /></div>
             </article>
           ))}
         </section>
