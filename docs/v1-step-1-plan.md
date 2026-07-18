@@ -129,3 +129,20 @@ Step 1 is done only when the requested architecture and matrix exist; all existi
 - The web lint gate now runs ESLint 9 directly through a flat compatibility configuration, removing the deprecated `next lint` command before the Next.js 16 transition.
 - Route-specific compatibility selectors are isolated behind `legacy-compat.css` and inherit shared semantic tokens. `redesign.css` is the final shell/component layer; new feature work may not extend the compatibility boundary.
 - The final release-gate results are recorded after clean database, type, lint, unit, build, and Playwright validation rather than inferred from implementation.
+
+## Final Step 1 verification (2026-07-18)
+
+| Gate | Result |
+| --- | --- |
+| Clean local database reset | Passed; all forward migrations replayed through `20260718225155_optimize_notification_preferences_rls.sql`. |
+| Database lint | Passed with zero errors in `public` and `private`. |
+| pgTAP | Passed: 6 files, 294 assertions. |
+| Local database advisors | No security errors; only the three documented performance warnings for separate owner/staff update policies on listings, events, and media. |
+| TypeScript | Passed across all 11 buildable workspaces. |
+| ESLint | Passed with zero warnings through the direct ESLint 9 gate. |
+| Unit and contract tests | Passed across web, worker, contracts, domain, and shared packages. |
+| Production build | Passed for the worker dry run, web, mobile architecture, and all shared packages; Next generated 50 pages. |
+| Playwright | Passed: 12 desktop/mobile tests including serious/critical axe, overflow, registration controls, dark theme, and keyboard focus. |
+| Production dependency audit | Passed with no known vulnerabilities at moderate or higher severity. |
+
+The advisor-driven notification-preference RLS migration wraps `auth.uid()` in scalar subqueries so PostgreSQL initializes the subject once per statement. Existing self-read/write RLS behavior remains covered by pgTAP; the migration removed all three notification-preference advisor warnings without weakening authorization.
