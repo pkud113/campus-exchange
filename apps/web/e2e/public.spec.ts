@@ -17,3 +17,14 @@ test("registration exposes searchable college and school-email controls", async 
   await expect(page.getByLabel(/college/i)).toBeVisible();
   await expect(page.getByLabel(/school.*email/i)).toBeVisible();
 });
+
+test("theme and keyboard focus remain usable across the public shell", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("campus-theme", "dark"));
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.keyboard.press("Tab");
+  const focused = page.locator(":focus");
+  await expect(focused).toBeVisible();
+  const outline = await focused.evaluate((element) => getComputedStyle(element).outlineStyle);
+  expect(outline).not.toBe("none");
+});

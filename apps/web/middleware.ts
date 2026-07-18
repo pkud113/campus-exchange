@@ -41,7 +41,10 @@ export async function middleware(request: NextRequest) {
         setAll: (items: Array<{name:string;value:string;options?:CookieOptions}>) => {
           for (const item of items) request.cookies.set(item.name, item.value);
           response = NextResponse.next({ request: { headers: requestHeaders } });
-          for (const item of items) item.options ? response.cookies.set(item.name, item.value, item.options as never) : response.cookies.set(item.name, item.value);
+          for (const item of items) {
+            if (item.options) response.cookies.set(item.name, item.value, item.options as never);
+            else response.cookies.set(item.name, item.value);
+          }
         }
       }
     });

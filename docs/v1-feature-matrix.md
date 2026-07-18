@@ -51,14 +51,14 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Safety | Reporting and protected snapshots | complete | yes | yes | partial | contract, pgTAP | Required |
 | Moderation | Campus/platform roles, AAL2, audit | complete | yes | yes | partial | contract, pgTAP | Required |
 | Moderation | Organization moderation boundaries | complete | yes | partial | partial | pgTAP | Step 1 foundation |
-| Navigation | Consistent desktop shell | incomplete | n/a | partial | n/a | unit | Step 1 complete |
-| Navigation | Mobile bottom nav/drawer | incomplete | n/a | partial | partial | E2E public only | Step 1 complete |
-| Navigation | All V1 areas, global search/create/context | missing | n/a | no | no | none | Step 1 complete |
-| Design system | Tokens, light/dark, focus, responsive shell | incomplete | n/a | partial | partial | theme unit | Step 1 complete |
-| Design system | Complete accessible primitive set | missing | n/a | no | no | none | Step 1 complete |
-| Design system | Domain cards/media/confirmation states | incomplete | n/a | partial | partial | sparse unit | Step 1 complete |
-| Web migration | Public/auth pages on final system | incomplete | n/a | partial | partial | public E2E | Step 1 complete |
-| Web migration | All authenticated/staff pages on final system | incomplete | n/a | partial | partial | none for auth layouts | Step 1 complete |
+| Navigation | Consistent desktop shell | complete | n/a | yes | n/a | unit | Step 1 complete |
+| Navigation | Mobile bottom nav/drawer | complete | n/a | yes | partial | unit, desktop/mobile E2E | Step 1 complete |
+| Navigation | All V1 areas, global search/create/context | complete | n/a | yes | partial | unit | Step 1 complete |
+| Design system | Tokens, light/dark, focus, responsive shell | complete | n/a | yes | yes | token/theme unit, E2E | Step 1 complete |
+| Design system | Complete accessible primitive set | complete | n/a | yes | partial | component unit, axe E2E | Step 1 complete |
+| Design system | Domain cards/media/confirmation states | complete | n/a | yes | partial | component unit | Step 1 complete |
+| Web migration | Public/auth pages on final system | complete | n/a | yes | partial | desktop/mobile axe E2E | Step 1 complete |
+| Web migration | All authenticated/staff pages on final system | complete | n/a | yes | partial | shell/navigation unit, build | Step 1 complete |
 | Shared architecture | Contracts and domain packages | complete | yes | yes | yes | unit/contract | Step 1 complete |
 | Shared architecture | API client, validation, tokens, analytics, shared types, testing | complete | yes | yes | yes | unit/contract | Step 1 complete |
 | Shared architecture | Mobile architecture/configuration | complete | n/a | n/a | yes | type/build | Step 1 complete |
@@ -66,7 +66,7 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Operations | CI reset/lint/pgTAP/type/lint/unit/build/E2E/audit | complete | yes | yes | partial | CI | Step 1 gate |
 | Quality | RLS campus isolation | complete for existing models | yes | n/a | yes | pgTAP | Required |
 | Quality | Friends/org/social/search RLS isolation | complete | yes | n/a | yes | pgTAP | Step 1 gate |
-| Quality | Design-system accessibility and layouts | missing | n/a | no | no | public E2E only | Step 1 gate |
+| Quality | Design-system accessibility and layouts | complete | n/a | yes | partial | component unit, desktop/mobile axe E2E | Step 1 gate |
 
 ## Step ownership
 

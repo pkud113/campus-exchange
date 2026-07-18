@@ -1,0 +1,9 @@
+/*
+ * Transitional compatibility boundary.
+ *
+ * globals.css contains proven route-specific selectors for pre-V1 screens.
+ * It is intentionally loaded through this one boundary while redesign.css
+ * supplies the V1 shell and primitives. New work must use shared --ce-* tokens
+ * and ui-* classes and must not add selectors to globals.css.
+ */
+@import "./globals.css";

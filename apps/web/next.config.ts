@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: { optimizePackageImports: ["lucide-react"] },
   images: { unoptimized: true },
-  transpilePackages: ["@campus-exchange/contracts", "@campus-exchange/domain"]
+  transpilePackages: ["@campus-exchange/contracts", "@campus-exchange/design-tokens", "@campus-exchange/domain"]
 };
 
 export default nextConfig;

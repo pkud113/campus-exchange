@@ -118,5 +118,14 @@ flowchart TD
 
 ## Definition of done
 
-Step 1 is done only when the requested architecture and matrix exist; all existing web routes use the final shell/primitives; no route has placeholder/mock-only actions; shared packages and mobile configuration build; the new data models, RLS, contracts, and API foundations work; block/campus/role/visibility isolation is tested; legacy styling is removed or has no route consumer; and every repository gate in CI passes from a clean checkout and reset.
+Step 1 is done only when the requested architecture and matrix exist; all existing web routes use the final shell and semantic tokens; no route has placeholder/mock-only actions; shared packages and mobile configuration build; the new data models, RLS, contracts, and API foundations work; block/campus/role/visibility isolation is tested; any proven route-specific compatibility selectors are isolated behind a documented boundary that new work cannot extend; and every repository gate in CI passes from a clean checkout and reset.
 
+## Execution record
+
+- `933b312` froze the architecture, permissions, journeys, visibility model, feature matrix, and task graph before application changes.
+- `d4f0e15` added the platform-neutral shared packages and mobile architecture boundary.
+- `813c834` added expanded profile, mutual-friend, organization, social, unified-search, media, notification, RLS, and trusted API foundations without broadening existing campus-private access.
+- The design-system slice promotes semantic tokens to `packages/design-tokens`, provides server and interactive accessible primitives, separates the navigation model from runtime behavior, and connects the global creation menu to real product flows.
+- The web lint gate now runs ESLint 9 directly through a flat compatibility configuration, removing the deprecated `next lint` command before the Next.js 16 transition.
+- Route-specific compatibility selectors are isolated behind `legacy-compat.css` and inherit shared semantic tokens. `redesign.css` is the final shell/component layer; new feature work may not extend the compatibility boundary.
+- The final release-gate results are recorded after clean database, type, lint, unit, build, and Playwright validation rather than inferred from implementation.

@@ -75,6 +75,13 @@ DOM-specific React components remain in `apps/web`. A future React Native applic
 
 All authorization is enforced in PostgreSQL RLS or locked trusted-server/RPC paths. UI role checks only control presentation.
 
+## Design-system ownership
+
+- `packages/design-tokens/src/tokens.css` is the web semantic-token adapter; native clients consume the platform-neutral TypeScript values from the same package.
+- `apps/web/app/redesign.css` owns the final V1 shell and component layer. Proven route-specific selectors that are not yet primitives are isolated behind `apps/web/app/legacy-compat.css`; new work must not extend that boundary or `globals.css`.
+- Accessible server-renderable primitives live in `apps/web/components/ui.tsx`. Stateful DOM primitives live in `ui-interactive.tsx`, keeping server routes free from unnecessary client JavaScript.
+- DOM-specific React components remain in `apps/web`; future React Native components share contracts, validation, analytics names, and tokens without importing DOM code.
+
 ## Visibility and network context
 
 Every discoverable content row declares a visibility value and an authoritative owning campus.

@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import "./globals.css";
+import "@campus-exchange/design-tokens/css";
+import "./legacy-compat.css";
 import "./redesign.css";
 import { ServiceWorker } from "@/components/service-worker";
+import { ToastProvider } from "@/components/ui-interactive";
 import { headers } from "next/headers";
 
 export const metadata: Metadata = {
@@ -21,5 +23,5 @@ export const viewport: Viewport = { themeColor: [{media:"(prefers-color-scheme: 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const themeScript=`(()=>{try{const value=localStorage.getItem('campus-theme')||'system';const resolved=value==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):value;document.documentElement.dataset.theme=resolved}catch{}})()`;
   const nonce=(await headers()).get("x-nonce")??undefined;
-  return <html lang="en" suppressHydrationWarning><head><script nonce={nonce} dangerouslySetInnerHTML={{__html:themeScript}}/></head><body><ServiceWorker/>{children}</body></html>;
+  return <html lang="en" suppressHydrationWarning><head><script nonce={nonce} dangerouslySetInnerHTML={{__html:themeScript}}/></head><body><ServiceWorker/><ToastProvider>{children}</ToastProvider></body></html>;
 }

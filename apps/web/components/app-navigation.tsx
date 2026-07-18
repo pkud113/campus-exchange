@@ -2,29 +2,14 @@
 
 import {
   Bell,
-  Building2,
-  CalendarDays,
   ChevronRight,
-  CirclePlus,
-  Home,
-  ListChecks,
   LogOut,
   Menu,
-  MessageCircle,
-  MessageSquareText,
-  Newspaper,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
-  Settings,
   ShieldCheck,
-  ShoppingBag,
-  Store,
-  UserRound,
-  UserRoundCheck,
-  UsersRound,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -37,7 +22,9 @@ import {
   sidebarToggleLabel,
   SIDEBAR_PREFERENCE_KEY,
 } from "@/lib/navigation";
+import { buildNavigationModel, type NavEntry } from "@/lib/app-navigation-model";
 import { Brand } from "./brand";
+import { CreateMenu } from "./create-menu";
 import { ThemeToggle } from "./theme-toggle";
 import { UserAvatar } from "./user-avatar";
 
@@ -55,13 +42,6 @@ type Props = {
   messageCount: number;
   discussionsEnabled: boolean;
   initialSidebarCollapsed: boolean;
-};
-
-type NavEntry = {
-  href: string;
-  label: string;
-  Icon: LucideIcon;
-  count?: number;
 };
 
 function formatCount(count?: number) {
@@ -217,46 +197,7 @@ export function AppNavigation({
     window.location.assign("/sign-in");
   }
 
-  const homeEntry: NavEntry = { href: "/home", label: "Home", Icon: Home };
-  const marketplaceEntry: NavEntry = { href: "/marketplace", label: "Marketplace", Icon: Store };
-  const socialEntry: NavEntry = { href: "/social", label: "Social", Icon: Newspaper };
-  const organizationsEntry: NavEntry = { href: "/organizations", label: "Organizations", Icon: Building2 };
-  const friendsEntry: NavEntry = { href: "/friends", label: "Friends", Icon: UserRoundCheck };
-  const discussionsEntry: NavEntry = { href: "/discussions", label: "Discussions", Icon: MessageSquareText };
-  const eventsEntry: NavEntry = { href: "/events", label: "Events", Icon: CalendarDays };
-  const peopleEntry: NavEntry = { href: "/people", label: "People", Icon: UsersRound };
-  const messagesEntry: NavEntry = { href: "/messages", label: "Messages", Icon: MessageCircle, count: messageCount };
-  const notificationsEntry: NavEntry = { href: "/notifications", label: "Notifications", Icon: Bell, count: notificationCount };
-  const main: NavEntry[] = [
-    homeEntry,
-    marketplaceEntry,
-    socialEntry,
-    organizationsEntry,
-    eventsEntry,
-    ...(discussionsEnabled ? [discussionsEntry] : []),
-    messagesEntry,
-  ];
-  const mobile: NavEntry[] = [
-    homeEntry,
-    marketplaceEntry,
-    socialEntry,
-    eventsEntry,
-    messagesEntry,
-  ];
-  const management: NavEntry[] = [
-    peopleEntry,
-    friendsEntry,
-    notificationsEntry,
-    { href: "/my/listings", label: "My listings", Icon: ShoppingBag },
-    { href: "/my/events", label: "My events", Icon: ListChecks },
-    { href: "/sell", label: "Create listing", Icon: CirclePlus },
-    { href: "/events/new", label: "Create event", Icon: CalendarDays },
-    ...(isStaff ? [{ href: "/admin", label: "Moderation", Icon: ShieldCheck }] : []),
-  ];
-  const account: NavEntry[] = [
-    { href: `/u/${profile.handle}`, label: "Profile", Icon: UserRound },
-    { href: "/settings", label: "Settings", Icon: Settings },
-  ];
+  const { main, mobile, management, account, peopleEntry, organizationsEntry, friendsEntry, notificationsEntry } = buildNavigationModel({ handle: profile.handle, isStaff, discussionsEnabled, notificationCount, messageCount });
   const closeMenu = () => setMenuOpen(false);
   const edgeControlLabel = sidebarToggleLabel(sidebarCollapsed);
 
@@ -278,6 +219,7 @@ export function AppNavigation({
           </button>
         </div>
         <nav aria-label="Campus Exchange navigation" className="sidebar-nav">
+          <CreateMenu />
           <NavSection label="Main" entries={main} path={path} />
           <NavSection label="Management" entries={management} path={path} />
         </nav>
@@ -349,6 +291,7 @@ export function AppNavigation({
                 <span><strong>{profile.displayName}</strong><small>@{profile.handle}</small></span>
               </div>
               <nav aria-label="Management and account destinations">
+                <CreateMenu compact onNavigate={() => setCompactMenuOpen(false)} />
                 <NavSection label="Management" entries={management} path={path} onNavigate={() => setCompactMenuOpen(false)} />
                 <NavSection label="Account" entries={account} path={path} onNavigate={() => setCompactMenuOpen(false)} />
               </nav>
@@ -405,6 +348,7 @@ export function AppNavigation({
               <ChevronRight aria-hidden="true" />
             </Link>
             <nav aria-label="More destinations">
+              <CreateMenu onNavigate={closeMenu} />
               <NavSection label="Discover" entries={[peopleEntry, organizationsEntry, friendsEntry, notificationsEntry]} path={path} onNavigate={closeMenu} />
               <NavSection label="Management" entries={management} path={path} onNavigate={closeMenu} />
               <NavSection label="Account" entries={account} path={path} onNavigate={closeMenu} />

@@ -51,6 +51,9 @@ importers:
       '@campus-exchange/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@campus-exchange/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@campus-exchange/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -79,6 +82,9 @@ importers:
         specifier: ^3.25.67
         version: 3.25.76
     devDependencies:
+      '@eslint/eslintrc':
+        specifier: ^3.3.6
+        version: 3.3.6
       '@axe-core/playwright':
         specifier: ^4.12.1
         version: 4.12.1(playwright-core@1.61.1)

@@ -15,7 +15,7 @@ export function SocialFeed() {
   async function react(post: Post) { const next = post.viewerReaction ? null : "like"; const response = await fetch(`/api/v1/social/posts/${post.id}/reactions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reaction: next }) }); const json = await response.json(); if (response.ok) setPosts((items) => items.map((item) => item.id === post.id ? { ...item, viewerReaction: next, reaction_count: json.data.count } : item)); }
   async function reply(postId: string) { const value = comment[postId]?.trim(); if (!value) return; const response = await fetch(`/api/v1/social/posts/${postId}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: value, parentCommentId: null, idempotencyKey: crypto.randomUUID() }) }); if (response.ok) { setComment((values) => ({ ...values, [postId]: "" })); setPosts((items) => items.map((item) => item.id === postId ? { ...item, comment_count: item.comment_count + 1 } : item)); } }
   return <div className="social-layout">
-    <SurfaceCard className="social-composer">
+    <SurfaceCard className="social-composer" id="composer">
       <form onSubmit={publish}>
         <label htmlFor="social-body">Share an update</label>
         <textarea id="social-body" value={body} onChange={(event) => setBody(event.target.value)} maxLength={10000} placeholder="What should your campus know?" required />
