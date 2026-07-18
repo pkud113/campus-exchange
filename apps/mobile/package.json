@@ -1,9 +1,8 @@
 {
-  "name": "@campus-exchange/contracts",
+  "name": "@campus-exchange/mobile",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -11,12 +10,11 @@
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@campus-exchange/analytics": "workspace:*",
+    "@campus-exchange/api-client": "workspace:*",
+    "@campus-exchange/design-tokens": "workspace:*",
     "@campus-exchange/shared-types": "workspace:*",
-    "@campus-exchange/validation": "workspace:*",
-    "zod": "^3.25.67"
+    "@campus-exchange/validation": "workspace:*"
   },
-  "devDependencies": {
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
-  }
+  "devDependencies": { "typescript": "^5.8.3", "vitest": "^3.2.4" }
 }

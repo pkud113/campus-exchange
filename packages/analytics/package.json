@@ -1,5 +1,5 @@
 {
-  "name": "@campus-exchange/domain",
+  "name": "@campus-exchange/analytics",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,6 @@
     "test": "vitest run",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
-  "dependencies": {
-    "@campus-exchange/contracts": "workspace:*",
-    "@campus-exchange/shared-types": "workspace:*"
-  },
+  "dependencies": { "@campus-exchange/shared-types": "workspace:*" },
   "devDependencies": { "typescript": "^5.8.3", "vitest": "^3.2.4" }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@campus-exchange/contracts",
+  "name": "@campus-exchange/shared-types",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,11 +9,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@campus-exchange/shared-types": "workspace:*",
-    "@campus-exchange/validation": "workspace:*",
-    "zod": "^3.25.67"
   },
   "devDependencies": {
     "typescript": "^5.8.3",

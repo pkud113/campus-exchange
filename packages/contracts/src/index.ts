@@ -1,5 +1,8 @@
 import { z } from "zod";
+import { academicField, biography, displayName, graduationYear, interests, searchQuery } from "@campus-exchange/validation";
+import type { ApiCollection, ApiResource, UnifiedSearchHit } from "@campus-exchange/shared-types";
 export { openApiDocument } from "./openapi";
+export type { ApiCollection, ApiResource, UnifiedSearchHit } from "@campus-exchange/shared-types";
 
 export const uuidSchema = z.string().uuid();
 export const utcDateSchema = z.string().datetime({ offset: true });
@@ -318,3 +321,60 @@ export type DiscussionComment = {
   author?: { handle?: string; display_name?: string | null };
   children?: DiscussionComment[];
 };
+
+export const profileVisibilitySchema = z.enum(["campus_only", "network", "friends", "private"]);
+export const expandedProfileInputSchema = z.object({
+  displayName,
+  biography,
+  academicField: academicField.nullable(),
+  graduationYear: graduationYear.nullable(),
+  graduationYearVisible: z.boolean(),
+  interests,
+  visibility: profileVisibilitySchema,
+}).strict();
+
+export const friendRequestInputSchema = z.object({ profileId: uuidSchema, idempotencyKey: uuidSchema }).strict();
+export const friendResponseInputSchema = z.object({ action: z.enum(["accept", "decline"]), idempotencyKey: uuidSchema }).strict();
+export const friendRemovalInputSchema = z.object({ idempotencyKey: uuidSchema }).strict();
+
+export const organizationSlugSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{2,62}$/);
+export const organizationRoleSchema = z.enum(["owner", "administrator", "officer", "member"]);
+export const organizationMembershipPolicySchema = z.enum(["open", "approval_required", "invitation_only"]);
+export const organizationInputSchema = z.object({
+  slug: organizationSlugSchema,
+  name: z.string().trim().min(3).max(120),
+  description: z.string().trim().min(10).max(5000),
+  visibility: z.enum(["campus_only", "network"]),
+  membershipPolicy: organizationMembershipPolicySchema,
+  websiteUrl: z.string().url().refine((value) => value.startsWith("https://"), "Use an HTTPS link").nullable(),
+  idempotencyKey: uuidSchema,
+}).strict();
+export const organizationMembershipInputSchema = z.object({
+  action: z.enum(["request", "invite", "accept", "decline", "cancel", "remove", "ban", "unban", "change_role"]),
+  profileId: uuidSchema.optional(),
+  role: organizationRoleSchema.optional(),
+  idempotencyKey: uuidSchema,
+}).strict();
+
+export const socialPostInputSchema = z.object({
+  body: z.string().trim().min(1).max(10000),
+  mediaIds: z.array(uuidSchema).max(4).refine((values) => new Set(values).size === values.length, "Media IDs must be unique"),
+  visibility: z.enum(["campus_only", "network", "friends"]),
+  organizationId: uuidSchema.nullable(),
+  idempotencyKey: uuidSchema,
+}).strict();
+export const socialPostUpdateSchema = socialPostInputSchema.omit({ idempotencyKey: true, organizationId: true });
+export const socialReactionInputSchema = z.object({ reaction: z.enum(["like", "celebrate", "support", "insightful"]).nullable() }).strict();
+export const socialCommentInputSchema = z.object({ body: z.string().trim().min(1).max(4000), parentCommentId: uuidSchema.nullable(), idempotencyKey: uuidSchema }).strict();
+
+export const unifiedSearchQuerySchema = searchQuery.extend({ campus: z.string().trim().toLowerCase().max(80).optional() });
+export const notificationCategorySchema = z.enum([
+  "friend_request", "friend_accepted", "message", "message_request", "social_reaction", "social_comment", "social_reply",
+  "organization_invitation", "organization_membership", "event_activity", "discussion_activity", "moderation_activity", "security_activity",
+]);
+
+export type ExpandedProfileInput = z.infer<typeof expandedProfileInputSchema>;
+export type OrganizationInput = z.infer<typeof organizationInputSchema>;
+export type SocialPostInput = z.infer<typeof socialPostInputSchema>;
+export type UnifiedSearchResponse = ApiCollection<UnifiedSearchHit>;
+export type FriendMutationResponse = ApiResource<{ relationshipId: string; status: "pending" | "accepted" | "declined" | "cancelled" | "removed" }>;

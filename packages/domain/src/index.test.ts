@@ -1,10 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { assertListingTransition, canCommentInDiscussion, canCreateDirectConversationRequest, canLeaveDiscussion, canManageDiscussionModerators, canManageOwnedContent, canModerateDiscussion, canPostInDiscussion, canRespondToConversationRequest, canTransferDiscussionOwnership, canTransitionListing, decideInstitutionRegistration, discussionCommentDepth, isValidDiscussionSlug, isVerificationCurrent, nextVoteValue, normalizeSchoolDomain, purgeAt, validateDiscussionPost, validatePassword } from "./index";
+import { assertListingTransition, canCommentInDiscussion, canCreateDirectConversationRequest, canLeaveDiscussion, canManageDiscussionModerators, canManageOrganizationMember, canManageOwnedContent, canModerateDiscussion, canPostInDiscussion, canRespondToConversationRequest, canSeeContent, canTransferDiscussionOwnership, canTransitionFriendRequest, canTransitionListing, decideInstitutionRegistration, discussionCommentDepth, isValidDiscussionSlug, isVerificationCurrent, nextVoteValue, normalizeSchoolDomain, purgeAt, validateDiscussionPost, validatePassword } from "./index";
 
 describe("listing lifecycle", () => {
   it("allows the intended forward path", () => expect(canTransitionListing("active", "reserved")).toBe(true));
   it("keeps terminal states terminal", () => expect(canTransitionListing("sold", "active")).toBe(false));
   it("requires a buyer for reservation", () => expect(() => assertListingTransition("active", "reserved")).toThrow(/buyer/i));
+});
+
+describe("V1 relationship and visibility rules", () => {
+  it("prevents organization role escalation and owner management", () => {
+    expect(canManageOrganizationMember({ actorRole: "administrator", targetRole: "member", nextRole: "officer", isSelf: false })).toBe(true);
+    expect(canManageOrganizationMember({ actorRole: "administrator", targetRole: "member", nextRole: "owner", isSelf: false })).toBe(false);
+    expect(canManageOrganizationMember({ actorRole: "owner", targetRole: "owner", isSelf: false })).toBe(false);
+  });
+
+  it("gives blocks precedence over every content visibility", () => {
+    expect(canSeeContent({ visibility: "network", sameCampus: true, isFriend: true, isMember: true, isOwner: false, blocked: true, networkEnabled: true })).toBe(false);
+    expect(canSeeContent({ visibility: "friends", sameCampus: false, isFriend: true, isMember: false, isOwner: false, blocked: false, networkEnabled: true })).toBe(true);
+  });
+
+  it("keeps friend request actions actor-specific", () => {
+    expect(canTransitionFriendRequest({ status: "pending", action: "accept", isRequester: false, isRecipient: true, blocked: false })).toBe(true);
+    expect(canTransitionFriendRequest({ status: "pending", action: "accept", isRequester: true, isRecipient: false, blocked: false })).toBe(false);
+    expect(canTransitionFriendRequest({ status: "accepted", action: "remove", isRequester: true, isRecipient: false, blocked: false })).toBe(true);
+  });
 });
 
 describe("discussion rules", () => {

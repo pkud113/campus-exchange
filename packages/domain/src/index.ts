@@ -1,4 +1,5 @@
 import type { ListingStatus } from "@campus-exchange/contracts";
+import type { ContentVisibility, OrganizationRole } from "@campus-exchange/shared-types";
 
 const transitions: Record<ListingStatus, readonly ListingStatus[]> = {
   draft: ["active", "withdrawn"],
@@ -142,4 +143,30 @@ export function validateDiscussionPost(input: { type: "text" | "link" | "image";
 
 export class DomainError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "DomainError"; }
+}
+
+const organizationRoleRank: Record<OrganizationRole, number> = { member: 0, officer: 1, administrator: 2, owner: 3 };
+
+export function canManageOrganizationMember(input: { actorRole: OrganizationRole; targetRole: OrganizationRole; nextRole?: OrganizationRole; isSelf: boolean }): boolean {
+  if (input.actorRole === "member" || input.actorRole === "officer" || input.isSelf || input.targetRole === "owner") return false;
+  const actorRank = organizationRoleRank[input.actorRole];
+  if (organizationRoleRank[input.targetRole] >= actorRank) return false;
+  return input.nextRole ? organizationRoleRank[input.nextRole] < actorRank : true;
+}
+
+export function canSeeContent(input: { visibility: ContentVisibility; sameCampus: boolean; isFriend: boolean; isMember: boolean; isOwner: boolean; blocked: boolean; networkEnabled: boolean }): boolean {
+  if (input.blocked) return false;
+  if (input.isOwner) return true;
+  if (input.visibility === "private") return false;
+  if (input.visibility === "campus_only") return input.sameCampus;
+  if (input.visibility === "network") return input.networkEnabled;
+  if (input.visibility === "friends") return input.isFriend;
+  return input.isMember;
+}
+
+export function canTransitionFriendRequest(input: { status: string; action: "accept" | "decline" | "cancel" | "remove"; isRequester: boolean; isRecipient: boolean; blocked: boolean }): boolean {
+  if (input.blocked) return false;
+  if (input.action === "accept" || input.action === "decline") return input.status === "pending" && input.isRecipient;
+  if (input.action === "cancel") return input.status === "pending" && input.isRequester;
+  return input.status === "accepted" && (input.isRequester || input.isRecipient);
 }

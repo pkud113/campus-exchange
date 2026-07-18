@@ -21,6 +21,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
 
+  apps/mobile:
+    dependencies:
+      '@campus-exchange/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
+      '@campus-exchange/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
+      '@campus-exchange/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
+      '@campus-exchange/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@campus-exchange/validation':
+        specifier: workspace:*
+        version: link:../../packages/validation
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
+
   apps/web:
     dependencies:
       '@campus-exchange/contracts':
@@ -110,11 +135,52 @@ importers:
         specifier: ^4.22.0
         version: 4.110.0(@cloudflare/workers-types@5.20260708.1)
 
+  packages/analytics:
+    dependencies:
+      '@campus-exchange/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
+
+  packages/api-client:
+    dependencies:
+      '@campus-exchange/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
+
   packages/contracts:
     dependencies:
+      '@campus-exchange/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@campus-exchange/validation':
+        specifier: workspace:*
+        version: link:../validation
       zod:
         specifier: ^3.25.67
         version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
+
+  packages/design-tokens:
     devDependencies:
       typescript:
         specifier: ^5.8.3
@@ -128,6 +194,44 @@ importers:
       '@campus-exchange/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@campus-exchange/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
+
+  packages/shared-types:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
+
+  packages/testing:
+    dependencies:
+      '@campus-exchange/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@22.20.1)(terser@5.16.9)(yaml@2.9.0)
+
+  packages/validation:
+    dependencies:
+      zod:
+        specifier: ^3.25.67
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: ^5.8.3
