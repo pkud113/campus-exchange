@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandedProfileInputSchema, friendRequestInputSchema, notificationCategorySchema, organizationInputSchema, socialPostInputSchema, unifiedSearchQuerySchema } from "./index";
+import { expandedProfileInputSchema, friendRequestInputSchema, notificationCategorySchema, organizationInputSchema, registrationOutcomeSchema, socialPostInputSchema, unifiedSearchQuerySchema } from "./index";
 
 const id = "00000000-0000-4000-8000-000000000001";
 
@@ -11,8 +11,12 @@ describe("V1 foundation contracts", () => {
       academicField: "Computer Science",
       graduationYear: 2028,
       graduationYearVisible: false,
+      academicFieldVisible: true,
       interests: ["Robotics", "robotics"],
       visibility: "campus_only",
+      friendListVisibility: "friends",
+      organizationMembershipVisibility: "campus_only",
+      activityVisibility: "campus_only",
     });
     expect(profile.interests).toEqual(["robotics"]);
   });
@@ -30,5 +34,10 @@ describe("V1 foundation contracts", () => {
   it("shares the complete V1 notification taxonomy", () => {
     expect(notificationCategorySchema.options).toContain("security_activity");
     expect(notificationCategorySchema.options).toHaveLength(13);
+  });
+
+  it("uses stable machine-readable registration outcomes", () => {
+    expect(registrationOutcomeSchema.parse("AMBIGUOUS_OR_SHARED_DOMAIN")).toBe("AMBIGUOUS_OR_SHARED_DOMAIN");
+    expect(registrationOutcomeSchema.options).toHaveLength(10);
   });
 });

@@ -23,8 +23,20 @@ export type NotificationCategory =
   | "security_activity";
 
 export type FriendRelationshipStatus = "pending" | "accepted" | "declined" | "cancelled" | "removed";
-export type OrganizationRole = "owner" | "administrator" | "officer" | "member";
-export type OrganizationMembershipStatus = "pending" | "active" | "declined" | "cancelled" | "removed" | "banned";
+export type OrganizationRole = "owner" | "administrator" | "moderator" | "officer" | "member";
+export type OrganizationMembershipStatus = "pending" | "invited" | "active" | "declined" | "cancelled" | "removed" | "banned";
+
+export type RegistrationOutcome =
+  | "SUPPORTED_AND_OPEN"
+  | "DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED"
+  | "AMBIGUOUS_OR_SHARED_DOMAIN"
+  | "CAMPUS_REGISTRATION_PAUSED"
+  | "DOMAIN_DISABLED"
+  | "ALUMNI_DOMAIN"
+  | "INSTITUTION_NOT_SUPPORTED"
+  | "INSTITUTION_DOMAIN_MISMATCH"
+  | "VERIFICATION_REQUEST_PENDING"
+  | "GLOBAL_SERVICE_UNAVAILABLE";
 
 export type PageMeta = { nextCursor: string | null; count?: number };
 export type ApiCollection<T> = { data: T[]; meta: PageMeta };

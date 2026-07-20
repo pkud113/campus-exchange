@@ -106,6 +106,7 @@ export const eventInputSchema = z.object({
   endsAt: utcDateSchema,
   capacity: z.number().int().positive().max(10_000).nullable().default(null),
   visibility: contentVisibilitySchema.default("campus_only"),
+  organizationId: uuidSchema.nullable().default(null),
   idempotencyKey: z.string().uuid()
 }).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), { message: "Event must end after it starts", path: ["endsAt"] });
 
@@ -125,7 +126,7 @@ export const messageInputSchema = z.object({
 });
 
 export const reportInputSchema = z.object({
-  targetType: z.enum(["listing", "event", "profile", "message", "conversation_request", "community", "discussion_post", "discussion_comment", "organization", "social_post", "social_comment"]),
+  targetType: z.enum(["listing", "event", "profile", "message", "conversation_request", "community", "discussion_post", "discussion_comment", "organization", "organization_channel", "organization_message", "organization_role", "organization_membership", "social_post", "social_comment", "institution", "account_security"]),
   targetId: uuidSchema,
   reason: z.enum(["fraud", "harassment", "prohibited_item", "spam", "unsafe", "other"]),
   details: z.string().trim().max(2000).default(""),
@@ -329,8 +330,12 @@ export const expandedProfileInputSchema = z.object({
   academicField: academicField.nullable(),
   graduationYear: graduationYear.nullable(),
   graduationYearVisible: z.boolean(),
+  academicFieldVisible: z.boolean(),
   interests,
   visibility: profileVisibilitySchema,
+  friendListVisibility: profileVisibilitySchema,
+  organizationMembershipVisibility: profileVisibilitySchema,
+  activityVisibility: profileVisibilitySchema,
 }).strict();
 
 export const friendRequestInputSchema = z.object({ profileId: uuidSchema, idempotencyKey: uuidSchema }).strict();
@@ -338,7 +343,7 @@ export const friendResponseInputSchema = z.object({ action: z.enum(["accept", "d
 export const friendRemovalInputSchema = z.object({ idempotencyKey: uuidSchema }).strict();
 
 export const organizationSlugSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{2,62}$/);
-export const organizationRoleSchema = z.enum(["owner", "administrator", "officer", "member"]);
+export const organizationRoleSchema = z.enum(["owner", "administrator", "moderator", "officer", "member"]);
 export const organizationMembershipPolicySchema = z.enum(["open", "approval_required", "invitation_only"]);
 export const organizationInputSchema = z.object({
   slug: organizationSlugSchema,
@@ -352,9 +357,105 @@ export const organizationInputSchema = z.object({
 export const organizationMembershipInputSchema = z.object({
   action: z.enum(["request", "invite", "accept", "decline", "cancel", "remove", "ban", "unban", "change_role", "transfer_ownership"]),
   profileId: uuidSchema.optional(),
+  profileHandle: usernameSchema.optional(),
   role: organizationRoleSchema.optional(),
+  confirmation: z.string().trim().max(120).optional(),
+  idempotencyKey: uuidSchema,
+}).strict().superRefine((value, context) => {
+  if (value.action === "invite" && !value.profileId && !value.profileHandle) context.addIssue({ code: z.ZodIssueCode.custom, path: ["profileHandle"], message: "Choose a member to invite" });
+  if (value.action === "transfer_ownership" && !value.profileId) context.addIssue({ code: z.ZodIssueCode.custom, path: ["profileId"], message: "Choose the intended successor" });
+  if (value.action === "transfer_ownership" && !value.confirmation) context.addIssue({ code: z.ZodIssueCode.custom, path: ["confirmation"], message: "Confirm the organization name" });
+});
+
+export const organizationChannelInputSchema = z.object({
+  categoryId: uuidSchema.nullable(),
+  name: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,49}$/),
+  description: z.string().trim().max(500).default(""),
+  type: z.enum(["text", "announcement"]),
+  visibility: z.enum(["standard", "restricted"]),
+  slowModeSeconds: z.number().int().min(0).max(21600).default(0),
+  allowedRoleIds: z.array(uuidSchema).max(20).default([]),
   idempotencyKey: uuidSchema,
 }).strict();
+
+export const organizationCategoryInputSchema = z.object({
+  name: z.string().trim().min(1).max(50),
+  sortPosition: z.number().int().min(0).max(32767).default(0),
+  idempotencyKey: uuidSchema,
+}).strict();
+
+export const organizationMessageInputSchema = z.object({
+  body: z.string().trim().min(1).max(4000),
+  parentMessageId: uuidSchema.nullable(),
+  idempotencyKey: uuidSchema,
+}).strict();
+
+export const organizationMessageMutationSchema = z.object({
+  action: z.enum(["edit", "delete"]),
+  body: z.string().trim().min(1).max(4000).default(""),
+  reason: z.string().trim().max(1000).default(""),
+}).superRefine((value, context) => {
+  if (value.action === "edit" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Edited messages require text" });
+});
+
+export const organizationRoleAssignmentSchema = z.object({
+  roleId: uuidSchema,
+  profileId: uuidSchema,
+  action: z.enum(["assign", "remove"]),
+  reason: z.string().trim().min(3).max(1000),
+}).strict();
+
+export const organizationPermissionSchema = z.enum([
+  "view_organization", "view_channels", "send_messages", "manage_messages", "create_announcements",
+  "manage_channels", "manage_roles", "assign_roles", "invite_members", "approve_membership_requests",
+  "remove_members", "ban_members", "manage_organization_profile", "create_organization_events",
+  "create_organization_posts", "view_audit_log",
+]);
+
+export const organizationRoleMutationSchema = z.object({
+  action: z.enum(["create", "update", "delete"]),
+  roleId: uuidSchema.nullable().default(null),
+  name: z.string().trim().min(1).max(40).default("Custom role"),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#476657"),
+  sortPosition: z.number().int().min(0).max(32767).default(50),
+  authorityRank: z.number().int().min(1).max(99).default(20),
+  permissions: z.array(organizationPermissionSchema).max(16).refine((values) => new Set(values).size === values.length, "Permissions must be unique").default([]),
+}).strict().superRefine((value, context) => {
+  if (value.action !== "create" && !value.roleId) context.addIssue({ code: z.ZodIssueCode.custom, path: ["roleId"], message: "A role is required" });
+});
+
+const permissionOverrideSchema = z.enum(["inherit", "allow", "deny"]);
+export const organizationChannelOverrideSchema = z.object({
+  targetType: z.enum(["role", "member"]),
+  targetId: uuidSchema,
+  viewChannel: permissionOverrideSchema,
+  sendMessages: permissionOverrideSchema,
+  manageMessages: permissionOverrideSchema,
+  createAnnouncements: permissionOverrideSchema,
+}).strict();
+
+export const moderationCaseActionSchema = z.object({
+  action: z.enum(["dismiss", "warn", "hide_content", "remove_content", "restore_content", "restrict_content", "lock_content", "temporary_account_restriction", "suspend", "restore", "ban_account", "restrict_organization", "suspend_organization", "remove_organization", "restrict_channel", "delete_channel_message", "remove_organization_role", "remove_organization_member", "restrict_community", "remove_listing", "cancel_event", "escalate", "request_information"]),
+  reason: z.string().trim().min(3).max(1000),
+  userMessage: z.string().trim().min(3).max(1000).nullable().default(null),
+  restrictionUntil: utcDateSchema.nullable().default(null),
+}).strict();
+
+export const moderationAppealSchema = z.object({
+  statement: z.string().trim().min(20).max(4000),
+  idempotencyKey: uuidSchema,
+}).strict();
+
+export const moderationAppealDecisionSchema = z.object({
+  action: z.enum(["assign", "approve", "reject", "request_information"]),
+  reviewerId: uuidSchema.nullable().default(null),
+  internalReason: z.string().trim().min(3).max(2000),
+  userResolution: z.string().trim().max(2000).default(""),
+  reverseAction: z.boolean().default(false),
+}).strict().superRefine((value, context) => {
+  if (value.action !== "assign" && value.userResolution.length < 3) context.addIssue({ code: z.ZodIssueCode.custom, path: ["userResolution"], message: "A user-visible message is required" });
+  if (value.action === "reject" && value.reverseAction) context.addIssue({ code: z.ZodIssueCode.custom, path: ["reverseAction"], message: "An upheld appeal cannot reverse an action" });
+});
 
 export const socialPostInputSchema = z.object({
   body: z.string().trim().min(1).max(10000),
@@ -366,12 +467,33 @@ export const socialPostInputSchema = z.object({
 export const socialPostUpdateSchema = socialPostInputSchema.omit({ idempotencyKey: true, organizationId: true });
 export const socialReactionInputSchema = z.object({ reaction: z.enum(["like", "celebrate", "support", "insightful"]).nullable() }).strict();
 export const socialCommentInputSchema = z.object({ body: z.string().trim().min(1).max(4000), parentCommentId: uuidSchema.nullable(), idempotencyKey: uuidSchema }).strict();
+export const socialPostMutationSchema = z.object({ action: z.enum(["edit", "delete"]), body: z.string().trim().max(10000).default(""), reason: z.string().trim().max(1000).default("") }).superRefine((value, context) => {
+  if (value.action === "edit" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Edited posts require a caption" });
+});
+export const socialCommentMutationSchema = z.object({ action: z.enum(["edit", "delete"]), body: z.string().trim().max(4000).default("") }).superRefine((value, context) => {
+  if (value.action === "edit" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Edited comments require text" });
+});
 
 export const unifiedSearchQuerySchema = searchQuery.extend({ campus: z.string().trim().toLowerCase().max(80).optional() });
 export const notificationCategorySchema = z.enum([
   "friend_request", "friend_accepted", "message", "message_request", "social_reaction", "social_comment", "social_reply",
   "organization_invitation", "organization_membership", "event_activity", "discussion_activity", "moderation_activity", "security_activity",
 ]);
+
+export const registrationOutcomeSchema = z.enum([
+  "SUPPORTED_AND_OPEN",
+  "DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED",
+  "AMBIGUOUS_OR_SHARED_DOMAIN",
+  "CAMPUS_REGISTRATION_PAUSED",
+  "DOMAIN_DISABLED",
+  "ALUMNI_DOMAIN",
+  "INSTITUTION_NOT_SUPPORTED",
+  "INSTITUTION_DOMAIN_MISMATCH",
+  "VERIFICATION_REQUEST_PENDING",
+  "GLOBAL_SERVICE_UNAVAILABLE",
+]);
+
+export type RegistrationOutcome = z.infer<typeof registrationOutcomeSchema>;
 
 export type ExpandedProfileInput = z.infer<typeof expandedProfileInputSchema>;
 export type OrganizationInput = z.infer<typeof organizationInputSchema>;

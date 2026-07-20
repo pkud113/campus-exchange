@@ -1,6 +1,6 @@
 export const openApiDocument = {
   openapi: "3.1.0",
-  info: { title: "Campus Exchange API", version: "1.3.0", description: "Versioned API for verified multi-campus marketplace, social, organization, events, people, and private messaging clients." },
+  info: { title: "Campus Exchange API", version: "1.4.0", description: "Versioned API for verified multi-campus marketplace, social profiles, organization workspaces, moderation, events, people, and private messaging clients." },
   servers: [{ url: "/api/v1" }],
   security: [{ cookieAuth: [] }],
   components: {
@@ -47,11 +47,17 @@ export const openApiDocument = {
     "/events/{id}": { get:{summary:"Get event",responses:{"200":{description:"Event"}}},patch:{summary:"Edit an owned event",responses:{"200":{description:"Updated"}}},delete:{summary:"Soft-delete an owned event",responses:{"200":{description:"Deleted"}}} },
     "/profiles": { get:{summary:"Search the safe verified-member directory",responses:{"200":{description:"Safe profile projections"}}},patch:{summary:"Update the current member profile",responses:{"200":{description:"Profile updated"}}} },
     "/profiles/{username}": { get:{summary:"Get a safe verified-member profile projection",responses:{"200":{description:"Profile"}}} },
+    "/profiles/{username}/content": { get:{summary:"Get a bounded privacy-aware Posts, Listings, Events, or About profile tab",responses:{"200":{description:"Cursor page or About memberships"}}} },
     "/friends": { get:{summary:"List incoming, outgoing, and accepted friend relationships",responses:{"200":{description:"Friend relationships"}}},post:{summary:"Send an idempotent friend request",requestBody:{required:true,content:{"application/json":{schema:{$ref:"#/components/schemas/FriendRequestInput"}}}},responses:{"201":{description:"Friend request created"}}} },
     "/friends/{profileId}": { patch:{summary:"Accept, decline, cancel, or remove a friend relationship",responses:{"200":{description:"Relationship updated"}}} },
     "/organizations": { get:{summary:"Discover visibility-aware campus and network organizations",responses:{"200":{description:"Organizations"}}},post:{summary:"Create an organization and owner membership atomically",requestBody:{required:true,content:{"application/json":{schema:{$ref:"#/components/schemas/OrganizationInput"}}}},responses:{"201":{description:"Organization created"}}} },
     "/organizations/{slug}": { get:{summary:"Get an organization and the memberships visible to the caller",responses:{"200":{description:"Organization"}}} },
     "/organizations/{slug}/memberships": { post:{summary:"Request, invite, accept, decline, cancel, remove, ban, unban, or change a membership",responses:{"200":{description:"Membership updated"}}} },
+    "/organizations/{slug}/categories": { post:{summary:"Create an audited channel category with manage-channels permission",responses:{"201":{description:"Category created"}}} },
+    "/organizations/{slug}/channels": { get:{summary:"List only discoverable categories/channels with capabilities and unread counts",responses:{"200":{description:"Authorized workspace navigation"}}},post:{summary:"Create a text, announcement, or role-restricted channel",responses:{"201":{description:"Channel created"}}} },
+    "/organizations/{slug}/channels/{channelId}/messages": { get:{summary:"Get a cursor page of RLS-filtered channel messages and mark it read",responses:{"200":{description:"Message page"}}},post:{summary:"Send a permission-checked, slow-mode-limited message or reply",responses:{"201":{description:"Message created"}}} },
+    "/organizations/messages/{messageId}": { patch:{summary:"Edit an owned message or delete with owner/moderator permission",responses:{"200":{description:"Message updated"}}} },
+    "/organizations/{slug}/roles": { post:{summary:"Assign or remove a lower-authority assignable role",responses:{"200":{description:"Role assignment updated"}}} },
     "/social/posts": { get:{summary:"Get a cursor-paginated visibility-aware social feed",responses:{"200":{description:"Social feed"}}},post:{summary:"Publish an idempotent social post",requestBody:{required:true,content:{"application/json":{schema:{$ref:"#/components/schemas/SocialPostInput"}}}},responses:{"201":{description:"Post created"}}} },
     "/social/posts/{postId}/reactions": { post:{summary:"Set, switch, or clear the current member's reaction",responses:{"200":{description:"Reaction and aggregate count"}}} },
     "/social/posts/{postId}/comments": { get:{summary:"List visible comments",responses:{"200":{description:"Comments"}}},post:{summary:"Create an idempotent comment or one-level reply",responses:{"201":{description:"Comment created"}}} },
@@ -89,5 +95,9 @@ export const openApiDocument = {
     "/uploads/{id}": { put:{summary:"Upload and transform the validated image body",responses:{"200":{description:"Media ready"}}} },
     "/admin/content/{type}/{id}": { patch:{summary:"MFA-protected edit or hide",responses:{"200":{description:"Content updated"}}},delete:{summary:"MFA-protected soft deletion",responses:{"200":{description:"Content deleted"}}} },
     "/admin/profiles/{id}": { patch:{summary:"MFA-protected suspension or restoration",responses:{"200":{description:"Profile updated"}}} }
+    ,"/admin/cases": { get:{summary:"Get the AAL2 and scope-filtered unified moderation queue",responses:{"200":{description:"Moderation cases"}}} }
+    ,"/admin/cases/{id}": { get:{summary:"Get protected case evidence, timeline, actions, and appeals",responses:{"200":{description:"Moderation case"}}} }
+    ,"/admin/cases/{id}/action": { post:{summary:"Apply a reasoned, audited, optionally reversible moderation action",responses:{"200":{description:"Action recorded"}}} }
+    ,"/moderation/appeals": { get:{summary:"List the affected member's appealable cases",responses:{"200":{description:"Appealable cases"}}},post:{summary:"Submit an idempotent appeal",responses:{"201":{description:"Appeal submitted"}}} }
   }
 } as const;
