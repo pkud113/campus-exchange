@@ -1,0 +1,44 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { Heart, LoaderCircle, MessageCircle, Pencil, Reply, Send, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ReportButton } from "@/components/report-button";
+import { UserAvatar } from "@/components/user-avatar";
+
+type Author = { handle?: string; display_name?: string | null; avatar_media_id?: string | null };
+type Post = { id: string; author_profile_id: string; body: string; visibility: string; reaction_count: number; comment_count: number; edited_at: string | null; created_at: string; social_post_media: Array<{ media_id: string; position: number }>; author: Author | null; viewerReaction: string | null; viewerOwns: boolean; viewerId: string };
+type Comment = { id: string; author_profile_id: string | null; parent_comment_id: string | null; body: string | null; edited_at: string | null; removed_at: string | null; deleted_at: string | null; created_at: string; author: Author | null };
+
+export function PostDetail({ postId }: { postId: string }) {
+  const router = useRouter(); const [post, setPost] = useState<Post | null>(null); const [comments, setComments] = useState<Comment[]>([]); const [loading, setLoading] = useState(true); const [notice, setNotice] = useState(""); const [comment, setComment] = useState(""); const [replyTo, setReplyTo] = useState<Comment | null>(null); const [editingPost, setEditingPost] = useState(false); const [editBody, setEditBody] = useState("");
+  const load = useCallback(async () => {
+    setLoading(true); const [postResponse, commentsResponse] = await Promise.all([fetch(`/api/v1/social/posts/${postId}`), fetch(`/api/v1/social/posts/${postId}/comments`)]); const [postJson, commentsJson] = await Promise.all([postResponse.json(), commentsResponse.json()]);
+    if (postResponse.ok) { setPost(postJson.data); setEditBody(postJson.data.body); } else setNotice(postJson.error?.message ?? "Post unavailable.");
+    if (commentsResponse.ok) setComments(commentsJson.data); setLoading(false);
+  }, [postId]);
+  useEffect(() => { void load(); }, [load]);
+  async function react() { if (!post) return; const next = post.viewerReaction ? null : "like"; const response = await fetch(`/api/v1/social/posts/${post.id}/reactions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reaction: next }) }); const json = await response.json(); if (response.ok) setPost({ ...post, viewerReaction: next, reaction_count: json.data.count }); }
+  async function submitComment(event: React.FormEvent) { event.preventDefault(); if (!post || !comment.trim()) return; const response = await fetch(`/api/v1/social/posts/${post.id}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: comment, parentCommentId: replyTo?.id ?? null, idempotencyKey: crypto.randomUUID() }) }); const json = await response.json(); if (response.ok) { setComment(""); setReplyTo(null); await load(); } else setNotice(json.error?.message ?? "Unable to add comment."); }
+  async function mutatePost(action: "edit" | "delete") { if (!post) return; if (action === "delete" && !window.confirm("Delete this post? It will be retained briefly for safety and then purged.")) return; const response = await fetch(`/api/v1/social/posts/${post.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, body: action === "edit" ? editBody : "", reason: action === "delete" ? "Deleted by author" : "" }) }); const json = await response.json(); if (!response.ok) setNotice(json.error?.message ?? "Unable to update post."); else if (action === "delete") router.push(`/u/${post.author?.handle ?? ""}`); else { setEditingPost(false); await load(); } }
+  async function mutateComment(target: Comment, action: "edit" | "delete") { const body = action === "edit" ? window.prompt("Edit comment", target.body ?? "") : ""; if (action === "edit" && !body?.trim()) return; if (action === "delete" && !window.confirm("Delete this comment?")) return; const response = await fetch(`/api/v1/social/comments/${target.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, body: body ?? "" }) }); const json = await response.json(); if (response.ok) await load(); else setNotice(json.error?.message ?? "Unable to update comment."); }
+  if (loading && !post) return <div className="profile-tab-loading"><LoaderCircle className="spin" /> Loading post…</div>;
+  if (!post) return <div className="empty-state"><h2>{notice || "Post unavailable"}</h2></div>;
+  const roots = comments.filter((item) => !item.parent_comment_id); const replies = (id: string) => comments.filter((item) => item.parent_comment_id === id);
+  return <article className="post-detail-card">
+    {post.social_post_media.length > 0 && <div className="post-detail-gallery">{post.social_post_media.sort((a,b) => a.position-b.position).map((media) => <img key={media.media_id} src={`/api/v1/media/${media.media_id}?variant=full`} alt={post.body.slice(0, 120)} />)}</div>}
+    <div className="post-detail-content"><header><Link href={`/u/${post.author?.handle}`}><UserAvatar name={post.author?.display_name ?? post.author?.handle ?? "Campus member"} mediaId={post.author?.avatar_media_id ?? null} /><span><strong>{post.author?.display_name ?? post.author?.handle}</strong><small>@{post.author?.handle} · {new Date(post.created_at).toLocaleString()}{post.edited_at ? " · edited" : ""}</small></span></Link><span className="ui-badge">{post.visibility.replace("_", " ")}</span></header>
+      {editingPost ? <div className="post-inline-editor"><textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} maxLength={10000} /><div><button className="button button-ghost button-small" onClick={() => setEditingPost(false)}>Cancel</button><button className="button button-primary button-small" onClick={() => mutatePost("edit")}>Save</button></div></div> : <p className="post-detail-caption">{post.body}</p>}
+      <div className="social-actions"><button type="button" className={post.viewerReaction ? "active" : ""} onClick={react} aria-pressed={Boolean(post.viewerReaction)}><Heart /> {post.reaction_count}</button><span><MessageCircle /> {post.comment_count}</span>{post.viewerOwns ? <><button type="button" onClick={() => setEditingPost(true)}><Pencil /> Edit</button><button type="button" onClick={() => mutatePost("delete")}><Trash2 /> Delete</button></> : <ReportButton targetType="social_post" targetId={post.id} className="social-action-report" />}</div>
+      <form className="post-comment-form" onSubmit={submitComment}>{replyTo && <div><span>Replying to @{replyTo.author?.handle}</span><button type="button" onClick={() => setReplyTo(null)}>Cancel</button></div>}<input value={comment} onChange={(event) => setComment(event.target.value)} maxLength={4000} placeholder="Add a comment" aria-label="Add a comment" /><button aria-label="Post comment" disabled={!comment.trim()}><Send /></button></form>
+      {notice && <p className="form-notice" role="status">{notice}</p>}
+      <section className="post-comments" aria-label="Comments">{roots.map((root) => <div className="comment-thread" key={root.id}><CommentRow comment={root} viewerId={post.viewerId} onReply={setReplyTo} onMutate={mutateComment} />{replies(root.id).map((reply) => <CommentRow key={reply.id} comment={reply} viewerId={post.viewerId} onReply={setReplyTo} onMutate={mutateComment} reply />)}</div>)}</section>
+    </div>
+  </article>;
+}
+
+function CommentRow({ comment, viewerId, onReply, onMutate, reply = false }: { comment: Comment; viewerId: string; onReply: (comment: Comment) => void; onMutate: (comment: Comment, action: "edit" | "delete") => void; reply?: boolean }) {
+  const unavailable = Boolean(comment.deleted_at || comment.removed_at);
+  return <article className={`post-comment ${reply ? "reply" : ""}`}><UserAvatar name={comment.author?.display_name ?? comment.author?.handle ?? "Former member"} mediaId={comment.author?.avatar_media_id ?? null} /><div><header><strong>{comment.author?.display_name ?? comment.author?.handle ?? "Former member"}</strong><small>{new Date(comment.created_at).toLocaleString()}{comment.edited_at ? " · edited" : ""}</small></header><p>{unavailable ? comment.removed_at ? "Comment removed by moderation" : "Comment deleted" : comment.body}</p>{!unavailable && <footer><button onClick={() => onReply(comment)}><Reply /> Reply</button>{comment.author_profile_id === viewerId ? <><button onClick={() => onMutate(comment, "edit")}><Pencil /> Edit</button><button onClick={() => onMutate(comment, "delete")}><Trash2 /> Delete</button></> : <ReportButton targetType="social_comment" targetId={comment.id} label="Report" className="comment-report" />}</footer>}</div></article>;
+}
