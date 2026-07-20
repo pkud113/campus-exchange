@@ -19,8 +19,9 @@ test("registration exposes searchable college and school-email controls", async 
 });
 
 test("theme and keyboard focus remain usable across the public shell", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("campus-theme", "dark"));
   await page.goto("/");
+  await page.evaluate(() => localStorage.setItem("campus-theme", "dark"));
+  await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.keyboard.press("Tab");
   const focused = page.locator(":focus");

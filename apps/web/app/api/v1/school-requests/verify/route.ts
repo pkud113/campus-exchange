@@ -1,4 +1,5 @@
 import { schoolRequestVerifySchema } from "@campus-exchange/contracts";
+import { registrationOutcomeMessages } from "@campus-exchange/domain";
 import { NextResponse } from "next/server";
 import { apiData, apiError, enforceRateLimit, parseJson, verifyMutationOrigin } from "@/lib/api";
 import { completeInstitutionDomainVerification } from "@/lib/institution-verification";
@@ -11,8 +12,14 @@ export async function POST(request: Request) {
   try {
     const result = await completeInstitutionDomainVerification(input);
     if (result?.outcome !== "verified" || !result.request_id) return apiError(request, 400, "bad_request", "That verification code is invalid or expired.");
-    return apiData(request, { verified: true, requestId: result.request_id, status: result.request_status ?? "pending" }, 202);
+    return apiData(request, {
+      verified: true,
+      requestId: result.request_id,
+      status: result.request_status ?? "pending",
+      outcome: "VERIFICATION_REQUEST_PENDING" as const,
+      message: registrationOutcomeMessages.VERIFICATION_REQUEST_PENDING,
+    }, 202);
   } catch {
-    return apiError(request, 503, "service_unconfigured", "School-domain verification is temporarily unavailable.");
+    return apiError(request, 503, "service_unconfigured", registrationOutcomeMessages.GLOBAL_SERVICE_UNAVAILABLE, { outcome: "GLOBAL_SERVICE_UNAVAILABLE" });
   }
 }

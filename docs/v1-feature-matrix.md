@@ -11,10 +11,10 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Identity | Staff invitation and MFA enforcement | complete | yes | yes | partial | contract, pgTAP | Required |
 | Identity | Server-derived campus and immutable username | complete | yes | yes | yes | pgTAP, contract | Required |
 | Profiles | Basic handle/display name/avatar/banner | complete | yes | yes | partial | unit, pgTAP | Step 1 foundation |
-| Profiles | Bio, academic field, graduation privacy, interests | incomplete | yes | yes | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
-| Profiles | Visibility and activity sections | incomplete | yes | partial | partial | pgTAP | Step 1 foundation; Step 2 UX |
-| Profiles | Mutual friends and organization memberships | incomplete | partial | partial | partial | pgTAP | Required |
-| Profiles | Safe same-campus/network projections without email | incomplete | yes | yes | partial | pgTAP | Step 1 harden |
+| Profiles | Bio, academics, interests, and field-level privacy | complete | yes | yes | partial | contract, unit, pgTAP | Required; mobile parity Step 3 |
+| Profiles | Posts gallery, Listings, Events, and About tabs | complete | yes | yes | partial | contract, unit, pgTAP; authenticated E2E pending | Required |
+| Profiles | Mutual friends and organization memberships | complete | yes | yes | partial | unit, pgTAP | Required |
+| Profiles | Safe same-campus/network projections without email | complete | yes | yes | partial | pgTAP | Required |
 | Friends | Send/accept/decline/cancel/remove | complete | yes | yes | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
 | Friends | Incoming/outgoing lists, counts, mutuals | incomplete | partial | yes | partial | pgTAP | Required |
 | Friends | Duplicate/contradiction/block prevention | complete | yes | yes | yes | pgTAP | Step 1 foundation |
@@ -28,20 +28,21 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Messaging | Dedicated request management UX | incomplete | yes | partial | no | pgTAP | Step 2 polish |
 | Events | Browse/create/edit/RSVP | complete | yes | yes | partial | contract, pgTAP | Required |
 | Events | Campus/network visibility | complete | yes | yes | partial | pgTAP | Required |
-| Events | Organization-owned events/activity | missing | no | no | no | none | Required |
+| Events | Organization-owned events/activity | complete | yes | yes | partial | contract, pgTAP | Required |
 | Discussions | Communities/memberships/ownership | complete | yes | yes | partial | contract, unit, pgTAP | Required |
 | Discussions | Posts/media/votes/saves/ranking/search | complete | yes | yes | partial | contract, unit, pgTAP | Required |
 | Discussions | Threaded comments and moderation | complete | yes | yes | partial | unit, pgTAP | Required |
-| Organizations | Profiles, campus/network status, links/media | incomplete | yes | partial | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
-| Organizations | Owner/admin/officer/member roles | complete | yes | partial | partial | pgTAP | Step 1 foundation |
-| Organizations | Join requests, invitations, membership policy | incomplete | yes | partial | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
-| Organizations | Posts, events, discussions, reporting/suspension | incomplete | partial | partial | no | pgTAP | Required |
-| Social | Profile and organization text/image posts | incomplete | yes | partial | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
+| Organizations | Workspace home, campus/network status, links/media | complete | yes | yes | partial | contract, pgTAP | Required |
+| Organizations | Categories, text/announcement/restricted channels, Realtime | complete | yes | yes | partial | pgTAP; authenticated E2E pending | Required |
+| Organizations | Owner/admin/moderator/officer/member roles and overrides | complete for built-ins | yes | yes | partial | contract, pgTAP | Required; custom-role editor Step 2 |
+| Organizations | Join requests, invitations, bans, ownership transfer | complete | yes | yes | partial | contract, pgTAP | Required |
+| Organizations | Posts, events, reporting, audit, safety restrictions | complete | yes | yes | partial | pgTAP | Required |
+| Social | Profile and organization text/image posts | complete | yes | yes | partial | contract, pgTAP | Required |
 | Social | Campus/network/friends visibility | complete | yes | yes | yes | pgTAP | Step 1 foundation |
-| Social | Reactions, comments, replies, edit, soft delete | incomplete | partial | partial | partial | contract, pgTAP | Required |
+| Social | Reactions, comments, replies, report, edit, soft delete | complete | yes | yes | partial | contract, pgTAP | Required |
 | Social | Visibility-aware paginated feeds | complete | yes | yes | partial | pgTAP | Step 1 foundation; Step 2 UX |
 | Search | Marketplace search | complete | yes | yes | partial | unit, pgTAP | Required |
-| Search | People and discussion search | incomplete | yes | yes | partial | unit, pgTAP | Required |
+| Search | People and discussion search with responsive action cards | complete | yes | yes | partial | unit, pgTAP; viewport E2E pending | Required |
 | Search | Unified multi-entity search | complete | yes | yes | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
 | Search | Blocking/visibility applied in trusted layer | complete | yes | yes | yes | pgTAP | Step 1 harden |
 | Notifications | In-app list/read state | complete | yes | yes | partial | unit, pgTAP | Required |
@@ -50,7 +51,8 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Safety | Global blocking | complete | yes | yes | partial | pgTAP | Required |
 | Safety | Reporting and protected snapshots | complete | yes | yes | partial | contract, pgTAP | Required |
 | Moderation | Campus/platform roles, AAL2, audit | complete | yes | yes | partial | contract, pgTAP | Required |
-| Moderation | Organization moderation boundaries | complete | yes | partial | partial | pgTAP | Step 1 foundation |
+| Moderation | Unified cases, evidence, organization/social actions, appeals/reversal | complete core | yes | yes | partial | contract, pgTAP | Required; advanced queue facets Step 2 |
+| Registration | Precise institution/domain outcome codes and copy | complete | yes | yes | partial | contract, unit, pgTAP, public E2E | Required |
 | Navigation | Consistent desktop shell | complete | n/a | yes | n/a | unit | Step 1 complete |
 | Navigation | Mobile bottom nav/drawer | complete | n/a | yes | partial | unit, desktop/mobile E2E | Step 1 complete |
 | Navigation | All V1 areas, global search/create/context | complete | n/a | yes | partial | unit | Step 1 complete |
@@ -71,7 +73,7 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 ## Step ownership
 
 - Step 1 moves every `Step 1 complete`, `Step 1 foundation`, `Step 1 harden`, and `Step 1 gate` row to the required readiness without shipping disconnected UI.
-- Step 2 completes the user-facing friends, organizations, social feed, expanded profiles, unified search, and notification workflows on web and mobile clients.
+- Step 2 completes the remaining custom-role/member-override settings, advanced moderation queue facets, authenticated end-to-end fixture coverage, message-request polish, and optional channel-reaction/notification-preference work listed in [the product-alignment correction](./v1-product-alignment.md).
 - Step 3 finishes operational hardening, release validation, production smoke, performance measurement, store/deployment readiness, and any remaining `partial` coverage.
 
 No row may be marked complete based only on a schema, mock screen, or visual component. Completion requires an integrated authorized path, working empty/loading/error states, and the listed minimum automated coverage.
