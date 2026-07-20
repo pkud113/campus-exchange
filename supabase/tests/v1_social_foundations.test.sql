@@ -81,7 +81,7 @@ reset role;
 
 select set_config('request.jwt.claim.sub','d1000000-0000-4000-8000-000000000001',true);
 set local role authenticated;
-select lives_ok($$select * from public.set_organization_membership((select id from public.organizations where slug='delta-robotics'),'d1000000-0000-4000-8000-000000000002','transfer_ownership',null,'d3000000-0000-4000-8000-000000000005')$$,'owner can transfer ownership to an active member');
+select lives_ok($$select * from public.transfer_organization_ownership((select id from public.organizations where slug='delta-robotics'),'d1000000-0000-4000-8000-000000000002','Delta Robotics','d3000000-0000-4000-8000-000000000005')$$,'owner can transfer ownership to an active member with organization-bound confirmation');
 select is((select role::text from public.organization_memberships where organization_id=(select id from public.organizations where slug='delta-robotics') and profile_id='d1000000-0000-4000-8000-000000000001'),'administrator','previous owner becomes an administrator');
 select is((select count(*)::integer from public.organization_memberships where organization_id=(select id from public.organizations where slug='delta-robotics') and role='owner' and status='active'),1,'organization retains exactly one active owner');
 select lives_ok($$select * from public.set_organization_membership((select id from public.organizations where slug='delta-robotics'),'e1000000-0000-4000-8000-000000000001','invite','officer','d3000000-0000-4000-8000-000000000004')$$,'organization administrator can invite a network officer');
