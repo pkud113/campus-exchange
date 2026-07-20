@@ -8,7 +8,7 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests --exclude e2e/**",
+    "test": "vitest run --passWithNoTests --exclude=e2e/**",
     "lint": "eslint . --max-warnings 0",
     "e2e": "playwright test",
     "admin:invite": "node scripts/admin-invite.mjs",
