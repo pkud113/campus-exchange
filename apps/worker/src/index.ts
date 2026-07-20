@@ -42,7 +42,7 @@ const discussionEventTypes = new Set([
 ]);
 
 const interactionEventTypes = new Set([
-  "conversation_request.created", "conversation_request.accepted", "event.rsvp_created", "moderation.report_resolved",
+  "conversation_request.created", "conversation_request.accepted", "event.rsvp_created", "moderation.report_resolved", "moderation.entity_actioned",
   "friend.requested", "friend.accepted", "organization.invited", "social.reacted", "social.commented", "social.replied",
 ]);
 
@@ -58,6 +58,7 @@ export function interactionNotificationCopy(eventType:string,payload:Record<stri
   if(eventType==="conversation_request.accepted")return{kind:"message_request",category:"message_request",title:"Message request accepted",body:"Your message request was accepted.",href:messageNotificationHref(payload.conversationId??"")};
   if(eventType==="event.rsvp_created")return{kind:"event",category:"event_activity",title:"New event RSVP",body:"A verified member RSVP'd to your event.",href:uuid.test(payload.eventId??"")?`/events?event=${payload.eventId}`:"/events"};
   if(eventType==="moderation.report_resolved")return{kind:"moderation",category:"moderation_activity",title:"Report reviewed",body:"A moderation team reviewed a report you submitted.",href:"/notifications"};
+  if(eventType==="moderation.entity_actioned")return{kind:"moderation",category:"moderation_activity",title:"Safety action applied",body:"A moderation team completed an action affecting your content or account. Review the outcome and appeal options.",href:uuid.test(payload.caseId??"")?`/appeals?case=${payload.caseId}`:"/appeals"};
   if(eventType==="friend.requested")return{kind:"friend_request",category:"friend_request",title:"New friend request",body:"A verified student sent you a friend request.",href:"/friends?tab=incoming"};
   if(eventType==="friend.accepted")return{kind:"friend_accepted",category:"friend_accepted",title:"Friend request accepted",body:"You are now friends.",href:"/friends"};
   if(eventType==="organization.invited")return{kind:"organization_invitation",category:"organization_invitation",title:"Organization invitation",body:"You were invited to join an organization.",href:/^[a-z0-9][a-z0-9-]{2,62}$/.test(payload.organizationSlug??"")?`/organizations/${payload.organizationSlug}`:"/organizations"};

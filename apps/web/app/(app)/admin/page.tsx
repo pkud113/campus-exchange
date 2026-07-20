@@ -1,8 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { AdminQueue } from "./admin-queue";
-import { AdminContent } from "./admin-content";
-import { AdminProfiles } from "./admin-profiles";
 
 export const metadata = { title: "Moderation" };
 
@@ -22,73 +20,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const { data: aal } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
   if (aal?.currentLevel !== "aal2") redirect("/settings?mfa=required");
 
-  const [
-    { data: reports },
-    { data: listings },
-    { data: events },
-    { data: profiles },
-  ] = await Promise.all([
-    db.rpc("moderation_report_queue"),
-    db
-      .from("listings")
-      .select("id,title,profiles!listings_seller_id_fkey(handle,display_name)")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    db
-      .from("events")
-      .select("id,title,profiles!events_organizer_id_fkey(handle,display_name)")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    db
-      .from("profiles")
-      .select("id,handle,display_name,status")
-      .neq("id", user.id)
-      .not("onboarding_completed_at", "is", null)
-      .in("status", ["active", "suspended"])
-      .order("created_at", { ascending: false })
-      .limit(20),
-  ]);
-  const owner = (value: unknown) => {
-    const row = Array.isArray(value) ? value[0] : value;
-    return row && typeof row === "object" && "display_name" in row
-      ? String(
-          (row as { display_name?: string; handle?: string }).display_name ??
-            (row as { handle?: string }).handle ??
-            "Campus member",
-        )
-      : "Campus member";
-  };
-  const content = [
-    ...(listings ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      type: "listing" as const,
-      owner: owner(item.profiles),
-    })),
-    ...(events ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      type: "event" as const,
-      owner: owner(item.profiles),
-    })),
-  ];
-  const memberProfiles = (profiles ?? [])
-    .filter((profile) => profile.handle)
-    .map((profile) => ({
-      id: profile.id,
-      username: profile.handle!,
-      displayName: profile.display_name ?? profile.handle!,
-      status: profile.status as "active" | "suspended",
-    }));
-  return (
-    <>
-      <AdminQueue initialReports={reports ?? []} initialSelectedId={selectedReportId} />
-      <main className="dashboard">
-        <AdminContent initialItems={content} />
-        <AdminProfiles initialProfiles={memberProfiles} />
-      </main>
-    </>
-  );
+  const { data: cases } = await db.rpc("moderation_case_queue", { chosen_status: null, chosen_entity: null, chosen_severity: null, chosen_assignee: null, chosen_organization: null, result_limit: 150 });
+  const scope = platformRoles?.length ? "Platform" : "Campus";
+  return <AdminQueue initialCases={cases ?? []} scope={scope} {...(selectedReportId ? { initialSelectedId: selectedReportId } : {})} />;
 }
