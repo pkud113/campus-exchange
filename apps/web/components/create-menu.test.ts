@@ -6,7 +6,7 @@ describe("global create menu", () => {
     expect(createDestinations.map(({ href }) => href)).toEqual([
       "/sell",
       "/events/new",
-      "/social#composer",
+      "/profile?tab=posts&compose=1#composer",
       "/organizations?create=1",
       "/discussions/create",
     ]);

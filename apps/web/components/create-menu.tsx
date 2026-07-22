@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 export const createDestinations = [
   { href: "/sell", label: "Marketplace listing", description: "Sell or give away an item", Icon: Store },
   { href: "/events/new", label: "Event", description: "Invite your campus or the network", Icon: CalendarDays },
-  { href: "/social#composer", label: "Social post", description: "Share an update", Icon: Newspaper },
+  { href: "/profile?tab=posts&compose=1#composer", label: "Social post", description: "Share from your profile", Icon: Newspaper },
   { href: "/organizations?create=1", label: "Organization", description: "Start a student group", Icon: Building2 },
   { href: "/discussions/create", label: "Discussion", description: "Ask or share with a community", Icon: MessageSquareText },
 ] as const;
