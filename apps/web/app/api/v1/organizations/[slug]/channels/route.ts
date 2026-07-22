@@ -1,6 +1,7 @@
 import { organizationChannelInputSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, apiError, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 type Params = { params: Promise<{ slug: string }> };
 type ChannelCapability = { channel_id: string; can_view: boolean; can_send: boolean; can_manage_messages: boolean; can_create_announcements: boolean };
@@ -59,6 +60,7 @@ export async function POST(request: Request, { params }: Params) {
   const input = await parseJson(request, organizationChannelInputSchema); if (input instanceof NextResponse) return input;
   const { slug } = await params; const id = await organizationId(context, slug);
   if (!id) return apiError(request, 404, "not_found", "Organization workspace not found.");
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"organization_channel",operation:"create",fields:{name:input.name,description:input.description},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("create_organization_channel", {
     target_organization: id, target_category: input.categoryId, submitted_name: input.name,
     submitted_description: input.description, submitted_type: input.type, submitted_visibility: input.visibility,

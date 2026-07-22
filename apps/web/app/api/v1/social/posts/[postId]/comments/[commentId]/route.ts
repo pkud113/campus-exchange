@@ -1,6 +1,7 @@
 import { socialCommentUpdateSchema } from "@campus-exchange/contracts";
 import { apiData, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
 import { NextResponse } from "next/server";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 type Params = { params: Promise<{ postId: string; commentId: string }> };
 
@@ -10,6 +11,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const limited = await enforceRateLimit(request, "social-comment-update", context.userId, 90, 3600); if (limited) return limited;
   const input = await parseJson(request, socialCommentUpdateSchema); if (input instanceof NextResponse) return input;
   const { commentId } = await params;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"social_comment",operation:"edit",fields:{body:input.body},targetId:commentId});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("update_social_comment", { target_comment: commentId, submitted_body: input.body });
   return error ? mutationError(request, error, "Unable to update this comment.") : apiData(request, { id: data });
 }

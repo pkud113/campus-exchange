@@ -9,6 +9,7 @@ import {
   validateDiscussionImage,
 } from "@/lib/discussion-upload-client";
 import { DiscussionImagePreview } from "./discussion-image-preview";
+import { ModerationReviewButton, moderationIssueFrom, type ModerationIssue } from "@/components/moderation-review-button";
 
 type PostType = "text" | "link" | "image";
 
@@ -22,9 +23,11 @@ export function DiscussionPostForm({ slug }: { slug: string }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploaded, setUploaded] = useState<{ fileKey: string; mediaId: string } | null>(null);
   const [uploadFailed, setUploadFailed] = useState(false);
+  const [moderationIssue,setModerationIssue]=useState<ModerationIssue|null>(null);
 
   function selectImage(file: File | null) {
     setError("");
+    setModerationIssue(null);
     setUploadFailed(false);
     setUploaded(null);
     if (!file) {
@@ -95,7 +98,7 @@ export function DiscussionPostForm({ slug }: { slug: string }) {
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error?.message ?? "Unable to publish this post.");
+      if (!response.ok){setModerationIssue(moderationIssueFrom(result));throw new Error(result.error?.message ?? "Unable to publish this post.");}
       router.push(`/discussions/c/${slug}/posts/${result.data.id}`);
       router.refresh();
     } catch (cause) {
@@ -123,6 +126,7 @@ export function DiscussionPostForm({ slug }: { slug: string }) {
     </section>
     {progress && <p className="form-notice" role="status">{progress}</p>}
     {error && <p className="form-error" role="alert">{error}</p>}
+    {moderationIssue&&<ModerationReviewButton issue={moderationIssue} onStatus={setError} onReviewed={() => setModerationIssue(null)}/>}
     {uploadFailed && selectedFile && <button type="button" className="button button-ghost" disabled={busy} onClick={() => void retryUpload()}><RefreshCw/>Retry image upload</button>}
     <button className="button button-primary" disabled={busy}>{busy ? <><LoaderCircle className="spin"/>Working…</> : "Publish post"}</button>
   </form>;

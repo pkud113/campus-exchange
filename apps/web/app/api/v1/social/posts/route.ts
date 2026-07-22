@@ -2,6 +2,7 @@ import { socialFeedQuerySchema, socialPostInputSchema } from "@campus-exchange/c
 import { apiData, apiError, decodeCursor, encodeCursor, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
 import { hydrateSocialPosts, type SocialPostRow } from "@/lib/social";
 import { NextResponse } from "next/server";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 export async function GET(request: Request) {
   const context = await requireVerified(request); if (context instanceof NextResponse) return context;
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
   const context = await requireVerified(request); if (context instanceof NextResponse) return context;
   const limited = await enforceRateLimit(request, "social-post", context.userId, 30, 3600); if (limited) return limited;
   const input = await parseJson(request, socialPostInputSchema); if (input instanceof NextResponse) return input;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"social_post",operation:"create",fields:{body:input.body},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("create_social_post", { submitted_body: input.body, submitted_media: input.mediaIds, submitted_visibility: input.visibility, submitted_organization: input.organizationId, request_key: input.idempotencyKey });
   if (error) return mutationError(request, error, "Unable to publish this post.");
   const { data: row } = await context.supabase.from("social_posts").select("*").eq("id", data).single();

@@ -282,6 +282,8 @@ async function runMaintenance(env: Env) {
     const { error } = await db.auth.admin.deleteUser(profile.id);
     if (error) throw error;
   }
+  const { error: moderationPurgeError } = await db.rpc("purge_content_moderation_data", { batch_size: 100 });
+  if (moderationPurgeError) throw moderationPurgeError;
 }
 
 export default {

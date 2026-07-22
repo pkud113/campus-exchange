@@ -1,6 +1,7 @@
 import { organizationRoleAssignmentSchema, organizationRoleMutationSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, apiError, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 type Params = { params: Promise<{ slug: string }> };
 export async function POST(request: Request, { params }: Params) {
@@ -21,6 +22,7 @@ export async function PUT(request: Request, { params }: Params) {
   const { slug } = await params;
   const { data: organization } = await context.supabase.from("organizations").select("id").eq("slug", slug.toLowerCase()).single();
   if (!organization) return apiError(request, 404, "not_found", "Organization not found.");
+  if(input.action!=="delete"){const moderation=await authorizeSharedTextMutation(request,context,{surface:"organization_role",operation:input.action==="create"?"create":"edit",fields:{name:input.name},targetId:input.roleId});if(moderation instanceof Response)return moderation;}
   const { data, error } = await context.supabase.rpc("manage_organization_role", {
     target_organization: organization.id, target_role: input.roleId, chosen_action: input.action,
     submitted_name: input.name, submitted_color: input.color, submitted_position: input.sortPosition,

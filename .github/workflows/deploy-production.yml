@@ -180,6 +180,13 @@ jobs:
       - name: Deploy web application
         run: pnpm --filter @campus-exchange/web run deploy
 
+      - name: Verify production moderation provider
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error --retry 3 \
+            --header "x-deployment-verification: $DOMAIN_VERIFICATION_SECRET" \
+            "$APP_ORIGIN/api/health/moderation" | jq -e '.status == "ok" and .service == "content-moderation"' >/dev/null
+
       - name: Verify production health
         shell: bash
         run: |
