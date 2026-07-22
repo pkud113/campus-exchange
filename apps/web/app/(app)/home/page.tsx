@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Heart,
   MessageCircle,
+  Newspaper,
   Plus,
   Search,
   ShieldCheck,
@@ -18,6 +19,8 @@ import { loadEvents, loadListings } from "@/lib/loaders";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { notificationHref } from "@/lib/notification-href";
+import { SocialPostCard } from "@/components/social/social-post-card";
+import { hydrateSocialPosts, type SocialPostRow } from "@/lib/social";
 
 export const metadata = { title: "Home" };
 
@@ -44,6 +47,7 @@ export default async function Home() {
     unreadNotificationsResult,
     favoritesResult,
     inboxResult,
+    socialPostsResult,
   ] = await Promise.all([
     loadListings({ limit: 8 }),
     loadEvents(),
@@ -52,6 +56,7 @@ export default async function Home() {
     db.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
     db.from("favorites").select("listing_id,created_at").eq("profile_id", user.id).order("created_at", { ascending: false }).limit(8),
     db.rpc("conversation_inbox"),
+    db.rpc("social_feed_filtered", { before_created: null, before_id: null, result_limit: 3, selected_scope: "for_you", target_author: null }),
   ]);
 
   const favoriteIds = (favoritesResult.data ?? []).map((item) => item.listing_id);
@@ -68,6 +73,7 @@ export default async function Home() {
   const campusValue = profileResult.data?.campuses;
   const campus = Array.isArray(campusValue) ? campusValue[0] : campusValue;
   const campusName = campus?.name ?? "Your campus";
+  const socialPosts = await hydrateSocialPosts(db, user.id, (socialPostsResult.data ?? []) as SocialPostRow[]);
   const firstName = (profileResult.data?.display_name ?? profileResult.data?.handle ?? "there").split(" ")[0];
   const stats = [
     { href: "/messages", label: "Unread messages", value: unreadMessages, Icon: MessageCircle },
@@ -109,6 +115,11 @@ export default async function Home() {
 
       <div className="home-layout">
         <div className="home-feed">
+          <SurfaceCard className="feed-section home-community-section" variant="accent">
+            <SectionHeader eyebrow="CAMPUS COMMUNITY" title="From your community" description="Recent updates shared with an audience that includes you." action={<Link href="/social">Open Social <ChevronRight /></Link>} />
+            {socialPosts.length ? <div className="home-social-preview">{socialPosts.slice(0, 2).map((post) => <SocialPostCard initialPost={post} compact interactive={false} key={post.id} />)}</div> : <div className="empty-state compact"><Newspaper /><h2>No community updates yet</h2><p>Visible profile and organization posts will appear here.</p><Link href="/profile?tab=posts&compose=1#composer">Create on your profile</Link></div>}
+          </SurfaceCard>
+
           <SurfaceCard className="feed-section">
             <SectionHeader eyebrow="MARKETPLACE" title="Fresh around campus" description="The newest listings from verified campus members." action={<Link href="/marketplace">See all <ChevronRight /></Link>} />
             {listings.length ? (

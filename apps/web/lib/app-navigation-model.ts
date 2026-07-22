@@ -24,6 +24,7 @@ export function buildNavigationModel({ handle, isStaff, discussionsEnabled, noti
   handle: string; isStaff: boolean; discussionsEnabled: boolean; notificationCount: number; messageCount: number;
 }) {
   const homeEntry: NavEntry = { href: "/home", label: "Home", Icon: Home };
+  const searchEntry: NavEntry = { href: "/search", label: "Search", Icon: Search };
   const marketplaceEntry: NavEntry = { href: "/marketplace", label: "Marketplace", Icon: Store };
   const socialEntry: NavEntry = { href: "/social", label: "Social", Icon: Newspaper };
   const organizationsEntry: NavEntry = { href: "/organizations", label: "Organizations", Icon: Building2 };
@@ -35,7 +36,6 @@ export function buildNavigationModel({ handle, isStaff, discussionsEnabled, noti
   const messagesEntry: NavEntry = { href: "/messages", label: "Messages", Icon: MessageCircle, count: messageCount };
   const main: NavEntry[] = [
     homeEntry,
-    { href: "/search", label: "Search", Icon: Search },
     marketplaceEntry,
     socialEntry,
     organizationsEntry,
@@ -56,5 +56,5 @@ export function buildNavigationModel({ handle, isStaff, discussionsEnabled, noti
     { href: `/u/${handle}`, label: "Profile", Icon: UserRound },
     { href: "/settings", label: "Settings", Icon: Settings },
   ];
-  return { main, mobile, management, account, peopleEntry, organizationsEntry, friendsEntry, notificationsEntry };
+  return { main, mobile, management, account, searchEntry, peopleEntry, organizationsEntry, friendsEntry, notificationsEntry };
 }

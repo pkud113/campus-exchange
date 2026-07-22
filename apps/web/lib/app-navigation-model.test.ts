@@ -4,7 +4,8 @@ import { buildNavigationModel } from "./app-navigation-model";
 describe("V1 information architecture", () => {
   it("exposes every primary V1 area and global utilities", () => {
     const model = buildNavigationModel({ handle: "student", isStaff: false, discussionsEnabled: true, notificationCount: 2, messageCount: 3 });
-    expect(model.main.map(({ href }) => href)).toEqual(["/home", "/search", "/marketplace", "/social", "/organizations", "/events", "/discussions", "/messages"]);
+    expect(model.searchEntry.href).toBe("/search");
+    expect(model.main.map(({ href }) => href)).toEqual(["/home", "/marketplace", "/social", "/organizations", "/events", "/discussions", "/messages"]);
     expect(model.management.map(({ href }) => href)).toContain("/notifications");
     expect(model.account.map(({ href }) => href)).toEqual(["/u/student", "/settings"]);
   });

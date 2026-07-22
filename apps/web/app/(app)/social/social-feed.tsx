@@ -1,36 +1,63 @@
 "use client";
 
+import { RefreshCcw, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Heart, MessageCircle, Send, UsersRound } from "lucide-react";
-import { EmptyState, SurfaceCard } from "@/components/ui";
-import { UserAvatar } from "@/components/user-avatar";
+import { Button, EmptyState, ErrorState, Skeleton } from "@/components/ui";
+import { SocialPostCard } from "@/components/social/social-post-card";
+import type { SocialPostView } from "@/lib/social";
 
-type Post = { id: string; body: string; visibility: string; reaction_count: number; comment_count: number; created_at: string; viewerReaction: string | null; author: { display_name?: string | null; handle?: string; avatar_media_id?: string | null } | null };
+type Scope = "for_you" | "campus" | "friends" | "network";
+const filterCopy: Record<Scope, { label: string; empty: string }> = {
+  for_you: { label: "For you", empty: "No visible community posts yet" },
+  campus: { label: "Campus", empty: "Your campus has not posted yet" },
+  friends: { label: "Friends", empty: "No posts from friends yet" },
+  network: { label: "Network", empty: "No network posts yet" },
+};
 
-export function SocialFeed() {
-  const [posts, setPosts] = useState<Post[]>([]); const [loading, setLoading] = useState(true); const [body, setBody] = useState(""); const [visibility, setVisibility] = useState("campus_only"); const [notice, setNotice] = useState(""); const [comment, setComment] = useState<Record<string, string>>({});
-  const load = useCallback(async () => { setLoading(true); const response = await fetch("/api/v1/social/posts?limit=30"); const json = await response.json(); setPosts(response.ok ? json.data.items : []); if (!response.ok) setNotice(json.error?.message ?? "Unable to load social posts."); setLoading(false); }, []);
-  useEffect(() => { void load(); }, [load]);
-  async function publish(event: React.FormEvent) { event.preventDefault(); if (!body.trim()) return; setNotice("Publishing…"); const response = await fetch("/api/v1/social/posts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body, mediaIds: [], visibility, organizationId: null, idempotencyKey: crypto.randomUUID() }) }); const json = await response.json(); if (!response.ok) { setNotice(json.error?.message ?? "Unable to publish."); return; } setBody(""); setNotice("Published."); await load(); }
-  async function react(post: Post) { const next = post.viewerReaction ? null : "like"; const response = await fetch(`/api/v1/social/posts/${post.id}/reactions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reaction: next }) }); const json = await response.json(); if (response.ok) setPosts((items) => items.map((item) => item.id === post.id ? { ...item, viewerReaction: next, reaction_count: json.data.count } : item)); }
-  async function reply(postId: string) { const value = comment[postId]?.trim(); if (!value) return; const response = await fetch(`/api/v1/social/posts/${postId}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: value, parentCommentId: null, idempotencyKey: crypto.randomUUID() }) }); if (response.ok) { setComment((values) => ({ ...values, [postId]: "" })); setPosts((items) => items.map((item) => item.id === postId ? { ...item, comment_count: item.comment_count + 1 } : item)); } }
-  return <div className="social-layout">
-    <SurfaceCard className="social-composer" id="composer">
-      <form onSubmit={publish}>
-        <label htmlFor="social-body">Share an update</label>
-        <textarea id="social-body" value={body} onChange={(event) => setBody(event.target.value)} maxLength={10000} placeholder="What should your campus know?" required />
-        <div className="composer-footer"><select aria-label="Post audience" value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="campus_only">My campus</option><option value="network">Campus Exchange network</option><option value="friends">Friends</option></select><button className="button button-primary"><Send /> Publish</button></div>
-      </form>
-      {notice && <p className="form-notice" role="status">{notice}</p>}
-    </SurfaceCard>
-    <section className="social-feed" aria-busy={loading} aria-label="Social posts">
-      {!loading && !posts.length && <EmptyState icon={<UsersRound />} title="No posts in this audience yet" description="Start a useful campus conversation with the composer above." />}
-      {posts.map((post) => <SurfaceCard className="social-post" key={post.id}>
-        <header><UserAvatar name={post.author?.display_name ?? post.author?.handle ?? "Campus member"} mediaId={post.author?.avatar_media_id ?? null} /><div><strong>{post.author?.display_name ?? post.author?.handle ?? "Campus member"}</strong><small>@{post.author?.handle ?? "member"} · {new Date(post.created_at).toLocaleString()}</small></div><span className="ui-badge">{post.visibility.replace("_", " ")}</span></header>
-        <p>{post.body}</p>
-        <div className="social-actions"><button type="button" className={post.viewerReaction ? "active" : ""} onClick={() => react(post)} aria-pressed={Boolean(post.viewerReaction)}><Heart /> {post.reaction_count}</button><span><MessageCircle /> {post.comment_count}</span></div>
-        <div className="inline-comment"><input aria-label="Add a comment" value={comment[post.id] ?? ""} onChange={(event) => setComment((values) => ({ ...values, [post.id]: event.target.value }))} placeholder="Add a comment" maxLength={4000}/><button type="button" aria-label="Send comment" onClick={() => reply(post.id)}><Send /></button></div>
-      </SurfaceCard>)}
+export function SocialFeed({ initialScope = "for_you", networkEnabled = true }: { initialScope?: Scope; networkEnabled?: boolean }) {
+  const [scope, setScope] = useState<Scope>(initialScope);
+  const [posts, setPosts] = useState<SocialPostView[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  const filters = (Object.keys(filterCopy) as Scope[]).filter((item) => item !== "network" || networkEnabled);
+
+  const load = useCallback(async (selected: Scope, nextCursor?: string) => {
+    if (nextCursor) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    setError("");
+    const query = new URLSearchParams({ scope: selected, limit: "20" }); if (nextCursor) query.set("cursor", nextCursor);
+    try {
+      const response = await fetch(`/api/v1/social/posts?${query}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error?.message ?? "Unable to load the social feed.");
+      setPosts((items) => nextCursor ? [...items, ...result.data.items] : result.data.items);
+      setCursor(result.data.nextCursor);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load the social feed."); }
+    finally { setLoading(false); setLoadingMore(false); }
+  }, []);
+
+  useEffect(() => { void load(scope); window.history.replaceState(null, "", scope === "for_you" ? "/social" : `/social?scope=${scope}`); }, [load, scope]);
+
+  function onFilterKey(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? filters.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + filters.length) % filters.length;
+    const selected = filters[next]; if (selected) { setScope(selected); document.getElementById(`social-filter-${selected}`)?.focus(); }
+  }
+
+  return <div className="social-discovery-layout">
+    <nav className="social-feed-filters" aria-label="Social feed filters" role="tablist">{filters.map((filter, index) => <button id={`social-filter-${filter}`} key={filter} role="tab" aria-selected={scope === filter} tabIndex={scope === filter ? 0 : -1} onKeyDown={(event) => onFilterKey(event, index)} onClick={() => setScope(filter)}>{filterCopy[filter].label}</button>)}</nav>
+    <section className="social-feed" aria-busy={loading || loadingMore} aria-live="polite" aria-label={`${filterCopy[scope].label} social posts`}>
+      {loading && <div className="social-feed-skeleton">{[1, 2, 3].map((item) => <Skeleton className="social-post-skeleton" key={item} />)}</div>}
+      {!loading && error && <ErrorState title="Social could not load" description={error} action={<Button onClick={() => load(scope)}><RefreshCcw /> Try again</Button>} />}
+      {!loading && !error && !posts.length && <EmptyState icon={<UsersRound />} title={filterCopy[scope].empty} description="Visible updates from verified students and organizations will appear here." />}
+      {!loading && !error && posts.map((post) => <SocialPostCard initialPost={post} networkEnabled={networkEnabled} key={post.id} onDeleted={(id) => setPosts((items) => items.filter((item) => item.id !== id))} />)}
+      {!loading && !error && cursor && <div className="social-load-more"><Button variant="secondary" busy={loadingMore} onClick={() => load(scope, cursor)}>Load more posts</Button></div>}
     </section>
   </div>;
 }

@@ -88,11 +88,11 @@ export function SectionHeader({ eyebrow, title, description, action }: {
   );
 }
 
-export function SurfaceCard({ children, className = "", id, as = "div" }: {
-  children: ReactNode; className?: string; id?: string; as?: "div" | "article" | "section";
+export function SurfaceCard({ children, className = "", id, as = "div", variant = "raised" }: {
+  children: ReactNode; className?: string; id?: string; as?: "div" | "article" | "section"; variant?: "raised" | "subtle" | "accent" | "media" | "borderless";
 }) {
   const Component = as;
-  return <Component id={id} className={classes("surface-card", className)}>{children}</Component>;
+  return <Component id={id} className={classes("surface-card", `surface-card-${variant}`, className)}>{children}</Component>;
 }
 
 export function EntityCard({ href, media, eyebrow, title, description, meta, actions, className }: {

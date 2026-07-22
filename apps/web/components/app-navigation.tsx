@@ -197,7 +197,7 @@ export function AppNavigation({
     window.location.assign("/sign-in");
   }
 
-  const { main, mobile, management, account, peopleEntry, organizationsEntry, friendsEntry, notificationsEntry } = buildNavigationModel({ handle: profile.handle, isStaff, discussionsEnabled, notificationCount, messageCount });
+  const { main, mobile, management, account, searchEntry, peopleEntry, organizationsEntry, friendsEntry, notificationsEntry } = buildNavigationModel({ handle: profile.handle, isStaff, discussionsEnabled, notificationCount, messageCount });
   const closeMenu = () => setMenuOpen(false);
   const edgeControlLabel = sidebarToggleLabel(sidebarCollapsed);
 
@@ -220,6 +220,7 @@ export function AppNavigation({
         </div>
         <nav aria-label="Campus Exchange navigation" className="sidebar-nav">
           <CreateMenu />
+          <div className="sidebar-search-utility"><NavItem entry={searchEntry} path={path} /></div>
           <NavSection label="Main" entries={main} path={path} />
           <NavSection label="Management" entries={management} path={path} />
         </nav>
@@ -268,7 +269,7 @@ export function AppNavigation({
           <span className="compact-brand-mark" aria-hidden="true"><span className="brand-mark"><i/><i/></span></span>
         </div>
         <nav className="compact-primary-nav" aria-label="Campus Exchange primary navigation">
-          {main.map((entry) => <NavItem entry={entry} path={path} iconOnly key={entry.href} />)}
+          {[searchEntry, ...main].map((entry) => <NavItem entry={entry} path={path} iconOnly key={entry.href} />)}
         </nav>
         <div className="compact-profile-menu" ref={compactMenuRef}>
           <button
