@@ -106,6 +106,7 @@ begin;
 delete from public.organizations where slug='${e2eOrganization.slug}';
 delete from public.moderation_cases where report_id in (select id from public.reports where reporter_id in (${fixtureIds}));
 delete from public.reports where reporter_id in (${fixtureIds});
+delete from public.conversation_requests where requester_id in (${fixtureIds}) or recipient_id in (${fixtureIds});
 delete from public.friend_relationships where profile_low_id in (${fixtureIds}) or profile_high_id in (${fixtureIds});
 delete from public.social_posts where author_profile_id in (${fixtureIds});
 delete from public.platform_role_assignments where profile_id in (${fixtureIds});
