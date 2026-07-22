@@ -1,6 +1,7 @@
 import { cursorSchema, organizationMessageInputSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, apiError, decodeCursor, encodeCursor, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 type Params = { params: Promise<{ slug: string; channelId: string }> };
 
@@ -28,6 +29,7 @@ export async function POST(request: Request, { params }: Params) {
   const limited = await enforceRateLimit(request, "organization-channel-message", context.userId, 120, 60); if (limited) return limited;
   const input = await parseJson(request, organizationMessageInputSchema); if (input instanceof NextResponse) return input;
   const { channelId } = await params;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"organization_message",operation:"create",fields:{body:input.body},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("send_organization_channel_message", { target_channel: channelId, parent_message: input.parentMessageId, submitted_body: input.body, request_key: input.idempotencyKey });
   return error ? mutationError(request, error, "Unable to send this message.") : apiData(request, { id: data }, 201);
 }

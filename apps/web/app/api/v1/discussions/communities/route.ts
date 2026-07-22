@@ -1,6 +1,7 @@
 import { discussionCommunityInputSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, apiError, discussionMutationError, enforceRateLimit, parseJson, requireDiscussions, verifyMutationOrigin } from "@/lib/api";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 export async function GET(request: Request) {
   const context = await requireDiscussions(request); if (context instanceof NextResponse) return context;
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
   const context = await requireDiscussions(request); if (context instanceof NextResponse) return context;
   const limited = await enforceRateLimit(request, "discussion-community-create", context.userId, 3, 86400); if (limited) return limited;
   const input = await parseJson(request, discussionCommunityInputSchema); if (input instanceof NextResponse) return input;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"discussion_community",operation:"create",fields:{slug:input.slug,displayName:input.displayName,description:input.description,rules:input.rules},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("create_discussion_community", { submitted_slug: input.slug, submitted_name: input.displayName, submitted_description: input.description, submitted_rules: input.rules, submitted_permission: input.postingPermission, submitted_key: input.idempotencyKey });
   if (error) return discussionMutationError(request, error, "Unable to create this community.");
   return apiData(request, data, 201);
