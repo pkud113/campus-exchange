@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: Params) {
   const profileIds = (data ?? []).flatMap((comment) => comment.author_profile_id ? [comment.author_profile_id] : []);
   const { data: profiles } = profileIds.length ? await context.supabase.rpc("safe_profile_cards", { target_ids: profileIds }) : { data: [] };
   const profileMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
-  return apiData(request, (data ?? []).map((comment) => ({ ...comment, author: comment.author_profile_id ? profileMap.get(comment.author_profile_id) ?? null : null })));
+  return apiData(request, (data ?? []).map((comment) => ({ ...comment, author: comment.author_profile_id ? profileMap.get(comment.author_profile_id) ?? null : null, canManage: comment.author_profile_id === context.userId })));
 }
 
 export async function POST(request: Request, { params }: Params) {

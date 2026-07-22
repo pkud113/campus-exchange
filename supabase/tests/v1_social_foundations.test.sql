@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(66);
+select plan(79);
 
 insert into public.campuses(id,name,short_name,slug,timezone,status) values
  ('d0000000-0000-4000-8000-000000000001','Campus Delta','Delta','campus-delta','America/Chicago','enabled'),
@@ -123,6 +123,22 @@ select is(public.set_social_reaction((select id from public.social_posts where i
 select is((select reaction_count from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000001'),1,'post reaction count is maintained');
 select lives_ok($$select public.create_social_comment((select id from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000001'),null,'Bring safety glasses.','d5000000-0000-4000-8000-000000000001')$$,'visible post can be commented on');
 select is((select comment_count from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000001'),1,'post comment count is maintained');
+select is((select count(*)::integer from public.social_feed_filtered(null,null,20,'campus',null)),1,'campus filter is applied before pagination');
+select is((select count(*)::integer from public.social_feed_filtered(null,null,20,'for_you',auth.uid())),1,'author-scoped feed returns visible personal posts');
+select lives_ok($$select public.update_social_post((select id from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000001'),'Updated campus robotics build night',array['d7000000-0000-4000-8000-000000000002'::uuid],'campus_only')$$,'author can update a social post with its existing media');
+select is((select body from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000001'),'Updated campus robotics build night','post update persists the body');
+select lives_ok($$select public.update_social_comment((select id from public.social_comments where idempotency_key='d5000000-0000-4000-8000-000000000001'),'Bring safety glasses and gloves.')$$,'comment author can edit a comment');
+select is((select body from public.social_comments where idempotency_key='d5000000-0000-4000-8000-000000000001'),'Bring safety glasses and gloves.','comment edit persists the body');
+select lives_ok($$select public.delete_social_comment((select id from public.social_comments where idempotency_key='d5000000-0000-4000-8000-000000000001'))$$,'comment author can soft delete a comment');
+select is((select comment_count from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000001'),0,'comment soft delete recalculates the aggregate count');
+select lives_ok($$select public.create_social_post('Temporary profile post',array[]::uuid[],'campus_only',null,'d4000000-0000-4000-8000-000000000003')$$,'author can create a post for deletion coverage');
+select lives_ok($$select public.delete_social_post((select id from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000003'))$$,'author can soft delete a social post');
+reset role;
+select ok((select status='deleted' and deleted_at is not null and purge_after>deleted_at from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000003'),'post soft deletion records status and purge schedule');
+
+select set_config('request.jwt.claim.sub','d1000000-0000-4000-8000-000000000002',true);
+set local role authenticated;
+select throws_ok($$select public.update_social_post((select id from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000001'),'Unauthorized edit',array[]::uuid[],'campus_only')$$,'P0002','post unavailable','a different member cannot update the post');
 reset role;
 
 select set_config('request.jwt.claim.sub','e1000000-0000-4000-8000-000000000001',true);
@@ -176,6 +192,7 @@ reset role;
 select is((select status::text from public.social_posts where idempotency_key='d4000000-0000-4000-8000-000000000002'),'removed','moderation marks social post removed');
 select is((select count(*)::integer from public.outbox_events where event_type='moderation.report_resolved' and aggregate_id=(select id from public.reports where idempotency_key='e6000000-0000-4000-8000-000000000001')),1,'moderation result is enqueued exactly once');
 select ok(not has_function_privilege('anon','public.create_social_post(text,uuid[],public.social_visibility,uuid,uuid)','EXECUTE'),'anonymous role cannot execute social mutations');
+select ok(not has_function_privilege('anon','public.update_social_post(uuid,text,uuid[],public.social_visibility)','EXECUTE'),'anonymous role cannot execute social ownership mutations');
 
 select * from finish();
 rollback;

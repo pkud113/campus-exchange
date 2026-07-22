@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandedProfileInputSchema, friendRequestInputSchema, notificationCategorySchema, organizationInputSchema, socialPostInputSchema, unifiedSearchQuerySchema } from "./index";
+import { expandedProfileInputSchema, friendRequestInputSchema, notificationCategorySchema, organizationInputSchema, socialFeedQuerySchema, socialPostInputSchema, unifiedSearchQuerySchema } from "./index";
 
 const id = "00000000-0000-4000-8000-000000000001";
 
@@ -24,6 +24,8 @@ describe("V1 foundation contracts", () => {
 
   it("bounds social media and unified search", () => {
     expect(socialPostInputSchema.parse({ body: "Hello campus", mediaIds: [], visibility: "friends", organizationId: null, idempotencyKey: id }).visibility).toBe("friends");
+    expect(socialFeedQuerySchema.parse({ scope: "campus", author: id }).scope).toBe("campus");
+    expect(() => socialFeedQuerySchema.parse({ scope: "private" })).toThrow();
     expect(unifiedSearchQuerySchema.parse({ q: "robotics", types: ["profile", "organization"] }).limit).toBe(20);
   });
 
