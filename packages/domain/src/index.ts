@@ -1,5 +1,6 @@
 import type { ListingStatus } from "@campus-exchange/contracts";
 import type { ContentVisibility, OrganizationRole } from "@campus-exchange/shared-types";
+import type { RegistrationOutcome } from "@campus-exchange/shared-types";
 
 const transitions: Record<ListingStatus, readonly ListingStatus[]> = {
   draft: ["active", "withdrawn"],
@@ -24,7 +25,20 @@ export function normalizeSchoolDomain(email: string): string {
   return email.slice(at + 1).toLowerCase().replace(/\.$/, "");
 }
 
-export type InstitutionRegistrationDecision = "staff" | "approved" | "pending_review" | "mismatch" | "alumni" | "campus_disabled" | "domain_disabled" | "institution_unavailable";
+export type InstitutionRegistrationDecision = Exclude<RegistrationOutcome, "VERIFICATION_REQUEST_PENDING" | "GLOBAL_SERVICE_UNAVAILABLE">;
+
+export const registrationOutcomeMessages: Record<RegistrationOutcome, string> = {
+  SUPPORTED_AND_OPEN: "This school and email domain are approved. Continue to verify your school email.",
+  DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED: "Your school is in the Campus Exchange directory, but this email domain has not been approved for registration yet.",
+  AMBIGUOUS_OR_SHARED_DOMAIN: "This email domain cannot currently be assigned safely to one campus. Registration will remain unavailable until the domain mapping is reviewed.",
+  CAMPUS_REGISTRATION_PAUSED: "Registration for this campus is currently paused.",
+  DOMAIN_DISABLED: "This school email domain is currently unavailable for registration.",
+  ALUMNI_DOMAIN: "Alumni email addresses cannot be used for student registration.",
+  INSTITUTION_NOT_SUPPORTED: "This institution is not currently open for Campus Exchange registration.",
+  INSTITUTION_DOMAIN_MISMATCH: "This school email domain is approved for a different institution. Check the selected school.",
+  VERIFICATION_REQUEST_PENDING: "We verified ownership of your school email. Registration will remain pending while the campus-domain mapping is reviewed.",
+  GLOBAL_SERVICE_UNAVAILABLE: "Registration is temporarily unavailable due to a service problem. Please try again later.",
+};
 
 export function decideInstitutionRegistration(input: {
   staffInvite: boolean;
@@ -33,13 +47,19 @@ export function decideInstitutionRegistration(input: {
   resolution: string;
   resolvedCampusId: string | null;
 }): InstitutionRegistrationDecision {
-  if (input.staffInvite) return "staff";
-  if (input.institutionRegistrationStatus !== "open") return "institution_unavailable";
-  if (input.resolution === "eligible") return input.selectedCampusId && input.selectedCampusId === input.resolvedCampusId ? "approved" : "mismatch";
-  if (input.resolution === "alumni") return "alumni";
-  if (input.resolution === "campus_disabled") return "campus_disabled";
-  if (input.resolution === "domain_disabled") return "domain_disabled";
-  return "pending_review";
+  if (input.staffInvite) return "SUPPORTED_AND_OPEN";
+  if (input.institutionRegistrationStatus === "suspended") return "CAMPUS_REGISTRATION_PAUSED";
+  if (input.institutionRegistrationStatus !== "open") return "INSTITUTION_NOT_SUPPORTED";
+  if (input.resolution === "eligible") {
+    return input.selectedCampusId && input.selectedCampusId === input.resolvedCampusId
+      ? "SUPPORTED_AND_OPEN"
+      : "INSTITUTION_DOMAIN_MISMATCH";
+  }
+  if (input.resolution === "ambiguous") return "AMBIGUOUS_OR_SHARED_DOMAIN";
+  if (input.resolution === "alumni") return "ALUMNI_DOMAIN";
+  if (input.resolution === "campus_disabled") return "CAMPUS_REGISTRATION_PAUSED";
+  if (input.resolution === "domain_disabled") return "DOMAIN_DISABLED";
+  return "DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED";
 }
 
 export function isVerificationCurrent(verifiedAt: Date, now = new Date()): boolean {
@@ -145,10 +165,10 @@ export class DomainError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "DomainError"; }
 }
 
-const organizationRoleRank: Record<OrganizationRole, number> = { member: 0, officer: 1, administrator: 2, owner: 3 };
+const organizationRoleRank: Record<OrganizationRole, number> = { member: 0, officer: 1, moderator: 2, administrator: 3, owner: 4 };
 
 export function canManageOrganizationMember(input: { actorRole: OrganizationRole; targetRole: OrganizationRole; nextRole?: OrganizationRole; isSelf: boolean }): boolean {
-  if (input.actorRole === "member" || input.actorRole === "officer" || input.isSelf || input.targetRole === "owner") return false;
+  if (input.actorRole === "member" || input.actorRole === "officer" || input.actorRole === "moderator" || input.isSelf || input.targetRole === "owner") return false;
   const actorRank = organizationRoleRank[input.actorRole];
   if (organizationRoleRank[input.targetRole] >= actorRank) return false;
   return input.nextRole ? organizationRoleRank[input.nextRole] < actorRank : true;

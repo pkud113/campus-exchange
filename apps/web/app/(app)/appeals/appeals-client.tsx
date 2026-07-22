@@ -1,0 +1,14 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Scale, Send } from "lucide-react";
+import { EmptyState, SurfaceCard } from "@/components/ui";
+
+type Case = { id: string; entity_type: string; status: string; user_visible_resolution: string | null; resolved_at: string | null; appeal_id: string | null; appeal_status: string | null };
+export function AppealsClient() {
+  const [cases, setCases] = useState<Case[]>([]); const [loading, setLoading] = useState(true); const [statement, setStatement] = useState<Record<string,string>>({}); const [notice, setNotice] = useState("");
+  async function load() { const response = await fetch("/api/v1/moderation/appeals"); const json = await response.json(); if (response.ok) setCases(json.data); else setNotice(json.error?.message ?? "Unable to load appeals."); setLoading(false); }
+  useEffect(() => { void load(); }, []);
+  async function submit(caseId: string) { const value = statement[caseId]?.trim(); if (!value || value.length < 20) return; const response = await fetch("/api/v1/moderation/appeals", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ caseId, statement: value, idempotencyKey: crypto.randomUUID() }) }); const json = await response.json(); setNotice(response.ok ? "Appeal submitted for independent review." : json.error?.message ?? "Unable to submit appeal."); if (response.ok) await load(); }
+  if (loading) return <div className="profile-tab-loading">Loading safety outcomes…</div>;
+  return <section className="appeals-list">{!cases.length && <EmptyState icon={<Scale />} title="No appealable outcomes" description="Safety outcomes that affect your account or content will appear here." />}{cases.map((item) => <SurfaceCard key={item.id} className="appeal-card"><header><div><span className="ui-badge">{item.status}</span><h2>{item.entity_type.replaceAll("_"," ")} outcome</h2></div><small>{item.resolved_at ? new Date(item.resolved_at).toLocaleString() : "Under review"}</small></header><p>{item.user_visible_resolution || "Campus Exchange safety staff completed a policy review."}</p>{item.appeal_id ? <div className="success-box"><Scale /><div><strong>Appeal {item.appeal_status}</strong><p>The safety team will record the outcome here. Submitting an appeal does not automatically reverse an action.</p></div></div> : <label>Appeal statement <small>Explain what was misunderstood and include relevant facts (20–4,000 characters).</small><textarea rows={5} minLength={20} maxLength={4000} value={statement[item.id] ?? ""} onChange={(event) => setStatement((values) => ({ ...values, [item.id]: event.target.value }))} /><button className="button button-primary" disabled={(statement[item.id]?.trim().length ?? 0) < 20} onClick={() => submit(item.id)}><Send /> Submit appeal</button></label>}</SurfaceCard>)}{notice && <p className="form-notice" role="status">{notice}</p>}</section>;
+}

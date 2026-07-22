@@ -12,6 +12,7 @@ out/
 coverage/
 playwright-report/
 test-results/
+.playwright/
 *.tsbuildinfo
 
 # Local configuration and credentials

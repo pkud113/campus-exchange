@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function EventForm() {
+export function EventForm({ organization }: { organization?: { id: string; name: string } | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,6 +26,7 @@ export function EventForm() {
         endsAt: new Date(String(form.get("endsAt"))).toISOString(),
         capacity: capacity ? Number(capacity) : null,
         visibility: form.get("visibility"),
+        organizationId: organization?.id ?? null,
         idempotencyKey: crypto.randomUUID(),
       }),
     });
@@ -43,6 +44,7 @@ export function EventForm() {
     <form className="listing-form" onSubmit={submit}>
       <section>
         <h2>Event details</h2>
+        {organization && <p className="form-notice">Creating for <strong>{organization.name}</strong>. Organization permissions are checked when you publish.</p>}
         <label>Title<input name="title" minLength={3} maxLength={120} placeholder="e.g. Saturday pickup soccer" required /></label>
         <label>Description<textarea name="description" minLength={10} maxLength={5000} rows={5} placeholder="What is happening, and who should come?" required /></label>
         <label>Location<input name="location" minLength={2} maxLength={200} placeholder="Actual event location" required /></label>

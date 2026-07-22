@@ -1,6 +1,6 @@
 # Campus Exchange V1 architecture
 
-Status: frozen for the three-step V1 completion program. Last reviewed: 2026-07-18.
+Status: revised for the product-alignment correction. Last reviewed: 2026-07-19.
 
 This document defines the target product and technical boundaries for Campus Exchange V1. The companion [feature matrix](./v1-feature-matrix.md) is the release source of truth, and the [Step 1 plan](./v1-step-1-plan.md) records implementation order, migration risks, and verification gates.
 
@@ -110,9 +110,23 @@ Use global search or contextual discovery, inspect a safe student projection, se
 
 Search/filter listings, inspect visibility and exchange methods, favorite or request contact, agree in private messages, and let the owner reserve/sell/withdraw. Campus-only is the default; network scope is explicit.
 
-### Social and organizations
+### Social profiles and organization workspaces
 
-Create a profile post or post as an authorized organization role, choose allowed visibility, attach private media, and receive reactions/comments. Join or request membership in an organization, accept invitations, RSVP to organization events, and participate without gaining administrative privileges.
+The student profile is the social identity boundary: a friend-based header and bounded Posts, Listings, Events, and About tabs. It deliberately has no follower model. Each tab is loaded independently with keyset pagination and uses the same block, active-member, campus/network, privacy, moderation, and soft-deletion predicates as its source product.
+
+An organization is a persistent channel workspace rather than a club profile. Members enter through open join, approval, or invitation flows; categories contain text, announcement, or restricted channels; authorized roles create organization posts and events. Channel discovery, reads, sends, moderation, and Realtime delivery all use the database permission resolver, so a hidden channel cannot be inferred from API metadata or message counts.
+
+Organization channel permission precedence is deterministic:
+
+1. Platform/campus safety state, active-profile state, organization suspension, organization/channel read-only state, and membership bans.
+2. The organization owner, except that safety read-only state still blocks new activity.
+3. Explicit member override.
+4. Any explicit denial among the member's assigned roles.
+5. Any explicit allowance among assigned roles.
+6. Assigned role permissions.
+7. The built-in organization default.
+
+The built-in authority order is Owner, Administrator, Moderator, Officer, Member. A role assignment is rejected when it targets the actor, the owner role, a non-assignable role, a role at or above the actor, or a member already at or above the actor. Ownership transfer is a separate confirmed mutation and is recorded in organization audit history.
 
 On web, the personal profile is the canonical creation and ownership surface. Social is a composer-free discovery feed, Home may show a read-only preview, and every surface consumes the same RLS-authorized post projection. Profile peer views are Posts, Listings, Events, Organizations, and About; their desktop tab row never wraps and narrow viewports scroll it horizontally.
 
@@ -122,7 +136,7 @@ Join a campus-private community, create a text/link/image post, vote, save, comm
 
 ### Safety and moderation
 
-Report a supported target, capture a protected evidence snapshot, route it by owning campus or network scope, require AAL2 and an eligible staff role, record an append-only action/audit entry, notify affected users generically, and retain/purge according to policy.
+Report a supported target, capture only the protected evidence the reporter is authorized to submit, and create a unified moderation case. Route the case by owning campus or explicit network scope, require AAL2 and an eligible staff role for every read/action, record append-only case events and audit entries, and notify reporters and affected subjects with generic copy. Reversible actions retain a minimal prior-state snapshot; reversal records the reversing moderator and time without deleting the original action. Appeals are submitted by the affected subject and remain in the same scoped case timeline.
 
 ## Information architecture
 

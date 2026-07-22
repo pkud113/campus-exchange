@@ -1,5 +1,6 @@
 import { registrationStartSchema } from "@campus-exchange/contracts";
-import { decideInstitutionRegistration, normalizeSchoolDomain } from "@campus-exchange/domain";
+import { decideInstitutionRegistration, normalizeSchoolDomain, registrationOutcomeMessages } from "@campus-exchange/domain";
+import type { RegistrationOutcome } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, apiError, enforceRateLimits, parseJson, verifyMutationOrigin } from "@/lib/api";
 import { sha256 } from "@/lib/auth";
@@ -40,25 +41,38 @@ export async function POST(request: Request) {
       resolution: reason,
       resolvedCampusId: resolution?.campus_id ?? null
     });
-    if (decision === "institution_unavailable") return apiError(request, 403, "forbidden", "This institution is not currently accepting registrations or domain-verification requests.", { reason: "institution_unavailable" });
-    if (decision === "mismatch") return apiError(request, 403, "forbidden", "That school email domain is approved for a different college. Check your selection.", { reason: "institution_domain_mismatch" });
-    if (decision === "alumni") return apiError(request, 403, "forbidden", "Alumni email domains do not qualify for student registration.", { reason: "alumni_domain" });
-    if (decision === "campus_disabled") return apiError(request, 403, "forbidden", "This campus is not currently accepting registrations.", { reason: "campus_disabled" });
-    if (decision === "domain_disabled") return apiError(request, 403, "forbidden", "Registration for this school email domain is currently disabled.", { reason: "domain_disabled" });
-    if (decision === "pending_review") {
-      const verification = await beginInstitutionDomainVerification({
-        institutionId: institution.id,
-        institutionName: institution.name,
-        email: input.email,
-        domain,
-        requesterAddress: request.headers.get("cf-connecting-ip") ?? "local"
-      });
+    const outcomeDetails = (outcome: RegistrationOutcome) => ({ outcome, institution: institution.name, domain });
+    if (decision === "INSTITUTION_NOT_SUPPORTED") return apiError(request, 403, "forbidden", registrationOutcomeMessages[decision], outcomeDetails(decision));
+    if (decision === "INSTITUTION_DOMAIN_MISMATCH") return apiError(request, 403, "forbidden", registrationOutcomeMessages[decision], outcomeDetails(decision));
+    if (decision === "ALUMNI_DOMAIN") return apiError(request, 403, "forbidden", registrationOutcomeMessages[decision], outcomeDetails(decision));
+    if (decision === "CAMPUS_REGISTRATION_PAUSED") return apiError(request, 403, "forbidden", registrationOutcomeMessages[decision], outcomeDetails(decision));
+    if (decision === "DOMAIN_DISABLED") return apiError(request, 403, "forbidden", registrationOutcomeMessages[decision], outcomeDetails(decision));
+    if (decision === "DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED" || decision === "AMBIGUOUS_OR_SHARED_DOMAIN") {
+      let verification: Awaited<ReturnType<typeof beginInstitutionDomainVerification>>;
+      try {
+        verification = await beginInstitutionDomainVerification({
+          institutionId: institution.id,
+          institutionName: institution.name,
+          email: input.email,
+          domain,
+          requesterAddress: request.headers.get("cf-connecting-ip") ?? "local"
+        });
+      } catch (error) {
+        console.error(JSON.stringify({ level: "error", event: "registration_domain_verification_failed", requestId: request.headers.get("x-request-id") ?? "unknown", code: error instanceof Error ? error.message : "unknown" }));
+        return apiError(request, 503, "service_unconfigured", registrationOutcomeMessages.GLOBAL_SERVICE_UNAVAILABLE, {
+          ...outcomeDetails("GLOBAL_SERVICE_UNAVAILABLE"),
+          registrationOutcome: decision,
+        });
+      }
       return apiData(request, {
         sent: true,
         verificationKind: "domain",
         challengeId: verification.challengeId,
         expiresAt: verification.expiresAt,
-        reason: reason === "ambiguous" ? "shared_domain" : "domain_review_required"
+        outcome: decision,
+        message: registrationOutcomeMessages[decision],
+        institution: institution.name,
+        domain,
       }, 202);
     }
     const { error } = await admin.auth.signInWithOtp({
@@ -68,11 +82,18 @@ export async function POST(request: Request) {
     if (error?.code === "over_email_send_rate_limit" || error?.code === "over_request_rate_limit") return apiError(request, 429, "rate_limited", "Too many verification emails were requested. Wait briefly and retry.");
     if (error) {
       console.error(JSON.stringify({ level: "error", event: "registration_otp_failed", requestId: request.headers.get("x-request-id") ?? "unknown", code: error.code ?? "unknown", status: error.status }));
-      return apiError(request, 503, "service_unconfigured", "Email delivery is temporarily unavailable.");
+      return apiError(request, 503, "service_unconfigured", registrationOutcomeMessages.GLOBAL_SERVICE_UNAVAILABLE, outcomeDetails("GLOBAL_SERVICE_UNAVAILABLE"));
     }
-    return apiData(request, { sent: true, verificationKind: "registration" });
+    return apiData(request, {
+      sent: true,
+      verificationKind: "registration",
+      outcome: "SUPPORTED_AND_OPEN" as const,
+      message: registrationOutcomeMessages.SUPPORTED_AND_OPEN,
+      institution: institution.name,
+      domain,
+    });
   } catch (error) {
     console.error(JSON.stringify({ level: "error", event: "registration_start_failed", requestId: request.headers.get("x-request-id") ?? "unknown", code: error instanceof Error ? error.message : "unknown" }));
-    return apiError(request, 503, "service_unconfigured", "Registration is temporarily unavailable.");
+    return apiError(request, 503, "service_unconfigured", registrationOutcomeMessages.GLOBAL_SERVICE_UNAVAILABLE, { outcome: "GLOBAL_SERVICE_UNAVAILABLE" });
   }
 }

@@ -12,7 +12,8 @@ export default async function People({ searchParams }: { searchParams: Promise<{
   const filters = await searchParams;
   const q = (filters.q ?? "").trim();
   const db = await createSupabaseServerClient();
-  const [{ data: campuses }, { data: people }] = await Promise.all([
+  const [{ data: { user } }, { data: campuses }, { data: people }] = await Promise.all([
+    db.auth.getUser(),
     db.from("campuses").select("name,short_name,slug").eq("status", "enabled").order("name"),
     q.length >= 2
       ? db.rpc("search_member_directory", { search_term: q, campus_filter: filters.campus || null, result_limit: 40 })
@@ -35,7 +36,7 @@ export default async function People({ searchParams }: { searchParams: Promise<{
             <article className="person-card" key={person.id}>
               <UserAvatar name={person.display_name ?? person.handle} mediaId={person.avatar_media_id} size="large" />
               <div><Link href={`/u/${person.handle}`}><strong>{person.display_name ?? person.handle}</strong></Link><span>@{person.handle}</span><small>{person.campus_short_name ?? person.campus_name} · Joined {new Date(person.joined_month).toLocaleDateString(undefined,{month:"short",year:"numeric"})}</small></div>
-              <div className="person-actions"><FriendRequestButton profileId={person.id}/><MessageRequestComposer profileId={person.id} username={person.handle} campus={person.campus_name} label="Message" /></div>
+              <div className="person-actions"><FriendRequestButton profileId={person.id} initialStatus={person.relationship_status} requestedBy={person.relationship_requested_by} viewerId={user?.id ?? null}/>{person.relationship_status !== "self" && <MessageRequestComposer profileId={person.id} username={person.handle} campus={person.campus_name} label="Message" />}</div>
             </article>
           ))}
         </section>

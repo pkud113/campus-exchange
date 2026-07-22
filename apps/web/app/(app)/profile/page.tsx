@@ -3,11 +3,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function Profile({ searchParams }: { searchParams: Promise<{ tab?: string; compose?: string }> }) {
   const query = await searchParams;
-  const db = await createSupabaseServerClient();
-  const { data: { user } } = await db.auth.getUser();
+  const db = await createSupabaseServerClient(); const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/sign-in?next=/profile");
-  const { data: profile } = await db.from("profiles").select("handle").eq("id", user.id).single();
-  if (!profile?.handle) redirect("/settings");
-  const params = new URLSearchParams(); params.set("tab", query.tab ?? "posts"); if (query.compose) params.set("compose", query.compose);
-  redirect(`/u/${profile.handle}?${params.toString()}${query.compose ? "#composer" : ""}`);
+  const { data } = await db.from("profiles").select("handle").eq("id", user.id).single();
+  if (!data?.handle) redirect("/onboarding");
+  const params = new URLSearchParams();
+  params.set("tab", query.tab ?? "posts");
+  if (query.compose) params.set("compose", query.compose);
+  redirect(`/u/${data.handle}?${params.toString()}${query.compose ? "#composer" : ""}`);
 }

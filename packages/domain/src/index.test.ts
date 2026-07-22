@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertListingTransition, canCommentInDiscussion, canCreateDirectConversationRequest, canLeaveDiscussion, canManageDiscussionModerators, canManageOrganizationMember, canManageOwnedContent, canModerateDiscussion, canPostInDiscussion, canRespondToConversationRequest, canSeeContent, canTransferDiscussionOwnership, canTransitionFriendRequest, canTransitionListing, decideInstitutionRegistration, discussionCommentDepth, isValidDiscussionSlug, isVerificationCurrent, nextVoteValue, normalizeSchoolDomain, purgeAt, validateDiscussionPost, validatePassword } from "./index";
+import { assertListingTransition, canCommentInDiscussion, canCreateDirectConversationRequest, canLeaveDiscussion, canManageDiscussionModerators, canManageOrganizationMember, canManageOwnedContent, canModerateDiscussion, canPostInDiscussion, canRespondToConversationRequest, canSeeContent, canTransferDiscussionOwnership, canTransitionFriendRequest, canTransitionListing, decideInstitutionRegistration, discussionCommentDepth, isValidDiscussionSlug, isVerificationCurrent, nextVoteValue, normalizeSchoolDomain, purgeAt, registrationOutcomeMessages, validateDiscussionPost, validatePassword } from "./index";
 
 describe("listing lifecycle", () => {
   it("allows the intended forward path", () => expect(canTransitionListing("active", "reserved")).toBe(true));
@@ -85,11 +85,29 @@ describe("student verification", () => {
   it("expires after one year", () => expect(isVerificationCurrent(new Date("2024-01-01"), new Date("2025-01-02"))).toBe(false));
   it("requires the approved domain to match the selected institution campus", () => {
     const base = { staffInvite: false, institutionRegistrationStatus: "open" as const, selectedCampusId: "msu", resolution: "eligible", resolvedCampusId: "msu" };
-    expect(decideInstitutionRegistration(base)).toBe("approved");
-    expect(decideInstitutionRegistration({ ...base, selectedCampusId: "purdue" })).toBe("mismatch");
-    expect(decideInstitutionRegistration({ ...base, resolution: "ambiguous", resolvedCampusId: null })).toBe("pending_review");
-    expect(decideInstitutionRegistration({ ...base, resolution: "alumni", resolvedCampusId: null })).toBe("alumni");
-    expect(decideInstitutionRegistration({ ...base, institutionRegistrationStatus: "suspended" })).toBe("institution_unavailable");
+    expect(decideInstitutionRegistration(base)).toBe("SUPPORTED_AND_OPEN");
+    expect(decideInstitutionRegistration({ ...base, selectedCampusId: "purdue" })).toBe("INSTITUTION_DOMAIN_MISMATCH");
+    expect(decideInstitutionRegistration({ ...base, resolution: "ambiguous", resolvedCampusId: null })).toBe("AMBIGUOUS_OR_SHARED_DOMAIN");
+    expect(decideInstitutionRegistration({ ...base, resolution: "unsupported", resolvedCampusId: null })).toBe("DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED");
+    expect(decideInstitutionRegistration({ ...base, resolution: "alumni", resolvedCampusId: null })).toBe("ALUMNI_DOMAIN");
+    expect(decideInstitutionRegistration({ ...base, resolution: "campus_disabled", resolvedCampusId: null })).toBe("CAMPUS_REGISTRATION_PAUSED");
+    expect(decideInstitutionRegistration({ ...base, resolution: "domain_disabled", resolvedCampusId: null })).toBe("DOMAIN_DISABLED");
+    expect(decideInstitutionRegistration({ ...base, institutionRegistrationStatus: "suspended" })).toBe("CAMPUS_REGISTRATION_PAUSED");
+    expect(decideInstitutionRegistration({ ...base, institutionRegistrationStatus: "closed" })).toBe("INSTITUTION_NOT_SUPPORTED");
+  });
+  it("keeps exact user-facing copy for every stable registration outcome", () => {
+    expect(registrationOutcomeMessages).toEqual({
+      SUPPORTED_AND_OPEN: "This school and email domain are approved. Continue to verify your school email.",
+      DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED: "Your school is in the Campus Exchange directory, but this email domain has not been approved for registration yet.",
+      AMBIGUOUS_OR_SHARED_DOMAIN: "This email domain cannot currently be assigned safely to one campus. Registration will remain unavailable until the domain mapping is reviewed.",
+      CAMPUS_REGISTRATION_PAUSED: "Registration for this campus is currently paused.",
+      DOMAIN_DISABLED: "This school email domain is currently unavailable for registration.",
+      ALUMNI_DOMAIN: "Alumni email addresses cannot be used for student registration.",
+      INSTITUTION_NOT_SUPPORTED: "This institution is not currently open for Campus Exchange registration.",
+      INSTITUTION_DOMAIN_MISMATCH: "This school email domain is approved for a different institution. Check the selected school.",
+      VERIFICATION_REQUEST_PENDING: "We verified ownership of your school email. Registration will remain pending while the campus-domain mapping is reviewed.",
+      GLOBAL_SERVICE_UNAVAILABLE: "Registration is temporarily unavailable due to a service problem. Please try again later.",
+    });
   });
 });
 

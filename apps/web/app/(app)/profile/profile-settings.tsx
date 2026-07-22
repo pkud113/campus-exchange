@@ -20,8 +20,12 @@ type Props = {
     academicField: string;
     graduationYear: number | null;
     graduationYearVisible: boolean;
+    academicFieldVisible: boolean;
     interests: string[];
     visibility: "campus_only" | "network" | "friends" | "private";
+    friendListVisibility: "campus_only" | "network" | "friends" | "private";
+    organizationMembershipVisibility: "campus_only" | "network" | "friends" | "private";
+    activityVisibility: "campus_only" | "network" | "friends" | "private";
     verifiedUntil: string;
     avatarId: string | null;
     bannerId: string | null;
@@ -65,8 +69,12 @@ export function ProfileSettings({ profile, isStaff }: Props) {
         academicField: form.get("academicField") || null,
         graduationYear: form.get("graduationYear") ? Number(form.get("graduationYear")) : null,
         graduationYearVisible: form.get("graduationYearVisible") === "on",
+        academicFieldVisible: form.get("academicFieldVisible") === "on",
         interests: String(form.get("interests") ?? "").split(",").map((value) => value.trim()).filter(Boolean),
         visibility: form.get("visibility"),
+        friendListVisibility: form.get("friendListVisibility"),
+        organizationMembershipVisibility: form.get("organizationMembershipVisibility"),
+        activityVisibility: form.get("activityVisibility"),
       }),
     });
     const body = await response.json();
@@ -230,6 +238,19 @@ export function ProfileSettings({ profile, isStaff }: Props) {
               <select name="visibility" defaultValue={profile.visibility}><option value="campus_only">My campus</option><option value="network">Campus Exchange network</option><option value="friends">Friends</option><option value="private">Only me</option></select>
             </label>
             <label className="checkbox-label"><input name="graduationYearVisible" type="checkbox" defaultChecked={profile.graduationYearVisible}/> Show graduation year</label>
+            <label className="checkbox-label"><input name="academicFieldVisible" type="checkbox" defaultChecked={profile.academicFieldVisible}/> Show field of study</label>
+            <label>
+              Friend list audience
+              <select name="friendListVisibility" defaultValue={profile.friendListVisibility}><option value="campus_only">My campus</option><option value="network">Campus Exchange network</option><option value="friends">Friends</option><option value="private">Only me</option></select>
+            </label>
+            <label>
+              Organization membership audience
+              <select name="organizationMembershipVisibility" defaultValue={profile.organizationMembershipVisibility}><option value="campus_only">My campus</option><option value="network">Campus Exchange network</option><option value="friends">Friends</option><option value="private">Only me</option></select>
+            </label>
+            <label>
+              Activity audience
+              <select name="activityVisibility" defaultValue={profile.activityVisibility}><option value="campus_only">My campus</option><option value="network">Campus Exchange network</option><option value="friends">Friends</option><option value="private">Only me</option></select>
+            </label>
           </div>
           {notice && (
             <p className="form-notice" role="status">
