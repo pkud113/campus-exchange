@@ -128,6 +128,8 @@ Organization channel permission precedence is deterministic:
 
 The built-in authority order is Owner, Administrator, Moderator, Officer, Member. A role assignment is rejected when it targets the actor, the owner role, a non-assignable role, a role at or above the actor, or a member already at or above the actor. Ownership transfer is a separate confirmed mutation and is recorded in organization audit history.
 
+On web, the personal profile is the canonical creation and ownership surface. Social is a composer-free discovery feed, Home may show a read-only preview, and every surface consumes the same RLS-authorized post projection. Profile peer views are Posts, Listings, Events, Organizations, and About; their desktop tab row never wraps and narrow viewports scroll it horizontally.
+
 ### Discussions
 
 Join a campus-private community, create a text/link/image post, vote, save, comment to depth eight, report abuse, and observe tombstones after deletion. Community and campus moderation stay separate.

@@ -465,8 +465,13 @@ export const socialPostInputSchema = z.object({
   idempotencyKey: uuidSchema,
 }).strict();
 export const socialPostUpdateSchema = socialPostInputSchema.omit({ idempotencyKey: true, organizationId: true });
+export const socialFeedQuerySchema = cursorSchema.extend({
+  scope: z.enum(["for_you", "campus", "friends", "network"]).default("for_you"),
+  author: uuidSchema.optional(),
+});
 export const socialReactionInputSchema = z.object({ reaction: z.enum(["like", "celebrate", "support", "insightful"]).nullable() }).strict();
 export const socialCommentInputSchema = z.object({ body: z.string().trim().min(1).max(4000), parentCommentId: uuidSchema.nullable(), idempotencyKey: uuidSchema }).strict();
+export const socialCommentUpdateSchema = socialCommentInputSchema.pick({ body: true });
 export const socialPostMutationSchema = z.object({ action: z.enum(["edit", "delete"]), body: z.string().trim().max(10000).default(""), reason: z.string().trim().max(1000).default("") }).superRefine((value, context) => {
   if (value.action === "edit" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Edited posts require a caption" });
 });
@@ -498,5 +503,6 @@ export type RegistrationOutcome = z.infer<typeof registrationOutcomeSchema>;
 export type ExpandedProfileInput = z.infer<typeof expandedProfileInputSchema>;
 export type OrganizationInput = z.infer<typeof organizationInputSchema>;
 export type SocialPostInput = z.infer<typeof socialPostInputSchema>;
+export type SocialFeedQuery = z.infer<typeof socialFeedQuerySchema>;
 export type UnifiedSearchResponse = ApiCollection<UnifiedSearchHit>;
 export type FriendMutationResponse = ApiResource<{ relationshipId: string; status: "pending" | "accepted" | "declined" | "cancelled" | "removed" }>;

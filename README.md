@@ -1,6 +1,6 @@
 # Campus Exchange
 
-The frozen [V1 architecture](docs/v1-architecture.md), [feature matrix](docs/v1-feature-matrix.md), and [Step 1 implementation plan](docs/v1-step-1-plan.md) define the three-step V1 completion program and its release gates.
+The frozen [V1 architecture](docs/v1-architecture.md), [feature matrix](docs/v1-feature-matrix.md), [Step 1 implementation plan](docs/v1-step-1-plan.md), and [Step 2A implementation record](docs/v1-step-2a.md) define the V1 completion program and its release gates.
 
 Campus Exchange is a verified multi-campus marketplace, events, messaging, and campus-discussions PWA. It is a TypeScript modular monolith built with Next.js, Cloudflare Workers/R2/Images, Supabase PostgreSQL/Auth/Realtime, and a scheduled outbox worker.
 

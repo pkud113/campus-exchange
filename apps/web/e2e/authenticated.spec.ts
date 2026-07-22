@@ -8,7 +8,9 @@ async function personaContext(browser: Browser, persona: PersonaKey) {
 
 async function pageFor(browser: Browser, persona: PersonaKey) {
   const context = await personaContext(browser, persona);
-  return { context, page: await context.newPage() };
+  const page = await context.newPage();
+  page.on("pageerror", (error) => console.error(`[browser page error] ${error.stack ?? error.message}`));
+  return { context, page };
 }
 
 async function expectResponsiveSurface(page: Page) {
@@ -48,9 +50,9 @@ test("profiles, gallery, organization tab, friendship state, and people search a
   const { context, page } = await pageFor(browser, "studentA");
   await page.goto(`/u/${personas.studentA.handle}`);
   await expect(page.getByRole("heading", { name: "Student A" })).toBeVisible();
-  for (const tab of ["Posts", "Listings", "Events", "Organizations", "About"]) await expect(page.getByRole("button", { name: tab, exact: true })).toBeVisible();
+  for (const tab of ["Posts", "Listings", "Events", "Organizations", "About"]) await expect(page.getByRole("tab", { name: tab, exact: true })).toBeVisible();
   await expect(page.getByText("Authenticated profile gallery fixture")).toBeVisible();
-  await page.getByRole("button", { name: "Organizations", exact: true }).click();
+  await page.getByRole("tab", { name: "Organizations", exact: true }).click();
   await expect(page.getByText("No organizations to show")).toBeVisible();
   await expectResponsiveSurface(page);
 
@@ -59,6 +61,56 @@ test("profiles, gallery, organization tab, friendship state, and people search a
   await page.goto(`/people?q=${encodeURIComponent("Organization")}`);
   await expect(page.getByRole("region", { name: "Member search results" })).toBeVisible();
   await expect(page.getByText("Organization Owner")).toBeVisible();
+  await expectResponsiveSurface(page);
+  await context.close();
+});
+
+test("profile is the canonical posting hub with responsive URL-addressable tabs", async ({ browser }, testInfo) => {
+  const { context, page } = await pageFor(browser, "studentA");
+  await page.goto("/profile?tab=posts");
+  await expect(page).toHaveURL(new RegExp(`/u/${personas.studentA.handle}\\?tab=posts`));
+  await expect(page.locator(".profile-tab-scroller")).toHaveAttribute("data-interactive", "true", { timeout: 15_000 });
+  const tabs = page.getByRole("tablist", { name: "Profile sections" }).getByRole("tab");
+  await expect(tabs).toHaveCount(5);
+  await expect(page.getByRole("heading", { name: "Share with your campus" })).toBeVisible();
+  if (testInfo.project.name === "desktop-chromium") {
+    const tops = await tabs.evaluateAll((items) => items.map((item) => Math.round(item.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
+  } else {
+    const metrics = await page.locator(".profile-tab-scroller").evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
+    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+  }
+  await tabs.filter({ hasText: "About" }).click();
+  await expect(page).toHaveURL(/tab=about/);
+  await expect(page.getByRole("heading", { name: "About", level: 2 })).toBeVisible();
+  await expectResponsiveSurface(page);
+  await context.close();
+});
+
+test("personal posts are created on profile and discovered through Social", async ({ browser }, testInfo) => {
+  const { context, page } = await pageFor(browser, "studentA");
+  const body = `Step 2A integrated ${testInfo.project.name} ${Date.now()}`;
+  await page.goto(`/u/${personas.studentA.handle}?tab=posts&compose=1`);
+  await expect(page.locator(".social-composer-form")).toHaveAttribute("data-interactive", "true", { timeout: 15_000 });
+  await page.getByLabel("Post text").fill(body);
+  await page.getByRole("button", { name: "Publish" }).click();
+  await expect(page.getByText("Post published.", { exact: true })).toBeVisible();
+  await expect(page.getByText(body)).toBeVisible();
+  await page.goto("/social");
+  await expect(page.getByRole("heading", { name: "Discover what’s happening" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Share with your campus" })).toHaveCount(0);
+  await expect(page.getByText(body)).toBeVisible();
+  await page.getByRole("tab", { name: "Campus" }).click();
+  await expect(page).toHaveURL(/scope=campus/);
+  await expect(page.getByText(body)).toBeVisible();
+  await context.close();
+});
+
+test("Home previews community activity without a duplicate composer", async ({ browser }) => {
+  const { context, page } = await pageFor(browser, "studentA");
+  await page.goto("/home");
+  await expect(page.getByRole("heading", { name: "From your community" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Share with your campus" })).toHaveCount(0);
   await expectResponsiveSurface(page);
   await context.close();
 });
