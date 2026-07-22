@@ -8,6 +8,10 @@ export async function POST(request: Request, { params }: Params) {
   const context = await requireStaff(request); if (context instanceof NextResponse) return context;
   const input = await parseJson(request, moderationCaseActionSchema); if (input instanceof NextResponse) return input;
   const { id } = await params;
+  if(input.action==="approve_content"||input.action==="uphold_block"){
+    const{data,error}=await context.supabase.rpc("moderate_automated_content_case",{target_case:id,chosen_action:input.action,action_reason:input.reason,user_message:input.userMessage});
+    return error?mutationError(request,error,"Unable to complete this automated-content review."):apiData(request,{actionId:data,completed:true});
+  }
   const { data, error } = await context.supabase.rpc("moderate_case", { target_case: id, chosen_action: input.action, action_reason: input.reason, user_message: input.userMessage, restriction_until: input.restrictionUntil });
   return error ? mutationError(request, error, "Unable to complete this moderation action.") : apiData(request, { actionId: data, completed: true });
 }

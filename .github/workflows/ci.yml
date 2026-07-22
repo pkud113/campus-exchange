@@ -30,6 +30,7 @@ jobs:
           echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
           echo "SUPABASE_SECRET_KEY=$SECRET_KEY" >> "$GITHUB_ENV"
           echo "APP_ORIGIN=http://127.0.0.1:3100" >> "$GITHUB_ENV"
+          echo "CONTENT_MODERATION_PROVIDER=deterministic" >> "$GITHUB_ENV"
       - name: Lint database functions and schemas
         run: supabase db lint --local --schema public,private --level error --fail-on error
       - name: Run pgTAP database tests
@@ -43,6 +44,7 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> "$GITHUB_ENV"
           echo "SUPABASE_SECRET_KEY=$SECRET_KEY" >> "$GITHUB_ENV"
           echo "APP_ORIGIN=http://127.0.0.1:3100" >> "$GITHUB_ENV"
+          echo "CONTENT_MODERATION_PROVIDER=deterministic" >> "$GITHUB_ENV"
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
