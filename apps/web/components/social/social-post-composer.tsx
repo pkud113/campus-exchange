@@ -1,10 +1,11 @@
 "use client";
 
 import { ImagePlus, LoaderCircle, Send, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Button, Select, TextArea } from "@/components/ui";
-import { maxImageBytes, normalizedImageType } from "@/lib/images";
-import type { SocialPostView } from "@/lib/social";
+import * as React from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Button, Select, TextArea } from "../ui";
+import { maxImageBytes, normalizedImageType } from "../../lib/images";
+import type { SocialPostView } from "../../lib/social";
 
 type SelectedImage = { key: string; file: File; preview: string; alt: string; decorative: boolean; id?: string; error?: string | undefined };
 
@@ -21,6 +22,8 @@ export function SocialPostComposer({ initialPost, networkEnabled = true, autoFoc
   const [images, setImages] = useState<SelectedImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => setInteractive(true), []);
   const remaining = 10000 - body.length;
   const mediaCount = existingMedia.length + images.length;
   const editing = Boolean(initialPost);
@@ -82,7 +85,7 @@ export function SocialPostComposer({ initialPost, networkEnabled = true, autoFoc
     } finally { setBusy(false); }
   }
 
-  return <form className="social-composer-form" onSubmit={submit}>
+  return <form className="social-composer-form" data-interactive={interactive} onSubmit={submit}>
     <div className="social-composer-heading"><div><span className="overline">{editing ? "EDIT POST" : "CREATE ON YOUR PROFILE"}</span><h2>{editing ? "Refine your update" : "Share with your campus"}</h2></div><span>{remaining.toLocaleString()} characters</span></div>
     <label className="sr-only" htmlFor={editing ? `social-body-${initialPost!.id}` : "social-body"}>Post text</label>
     <TextArea id={editing ? `social-body-${initialPost!.id}` : "social-body"} value={body} onChange={(event) => setBody(event.target.value)} maxLength={10000} rows={5} placeholder="What should your campus know?" required autoFocus={autoFocus} />

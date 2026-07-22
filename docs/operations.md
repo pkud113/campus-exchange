@@ -142,7 +142,8 @@ Deployment is fail-closed: the deploy workflow calls the complete reusable CI jo
 - Existing account: one final OTP, retained username, password setup, then username/email login.
 - Recovery: identical start response for known/unknown identifiers, six-digit recovery code, new password, other sessions revoked.
 - Session isolation: account A signs in, views profile/messages, logs out, account B signs in in the same browser, Back is used, and no account-A HTML/API/message data appears. Inspect Cache Storage to confirm only public shell assets exist.
-- Profiles: same-campus behavior, safe global search/profile projection, excluded inactive/suspended/blocked accounts, avatar/banner authorization, and no broad cross-campus profile-table reads.
+- Profiles: same-campus behavior, safe global search/profile projection, excluded inactive/suspended/blocked accounts, avatar/banner authorization, URL-addressable activity tabs, owner-only post composer/actions, and no broad cross-campus profile-table reads.
+- Social: For You/Campus/Friends/Network filters, author-scoped profile feeds, keyset pagination, private post media, reactions, comments/replies, owner edit/soft delete, blocked/cross-campus denial, manual reports, protected snapshots, and generic moderation outcomes.
 - Listings/events: campus-only default, explicit network visibility, truthful legacy exchange display, exchange validation on edit, campus filters, cross-campus RSVP rules, narrowing safeguards, immediate soft delete, and owner/cross-user denial.
 - Upload abuse: spoofed MIME, invalid decoded bytes, >8 MB, seventh listing image, another user’s media, deleted media, and original R2 URL denial.
 - Messaging: direct/listing/event opening request, incoming/sent states, idempotent retry, daily limit, decline cooldown, transactional accept/first-message insertion, global block cancellation, read-only blocked history, unread recovery, and duplicate rejection.

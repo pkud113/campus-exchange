@@ -1,9 +1,10 @@
 "use client";
 
 import { Flag } from "lucide-react";
+import * as React from "react";
 import { useRef, useState } from "react";
-import { Button, TextArea } from "@/components/ui";
-import { Dialog } from "@/components/ui-interactive";
+import { Button, TextArea } from "../ui";
+import { Dialog } from "../ui-interactive";
 
 export function SocialReportAction({ targetType, targetId }: { targetType: "social_post" | "social_comment"; targetId: string }) {
   const [open, setOpen] = useState(false);

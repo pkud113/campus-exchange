@@ -12,7 +12,7 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Identity | Server-derived campus and immutable username | complete | yes | yes | yes | pgTAP, contract | Required |
 | Profiles | Basic handle/display name/avatar/banner | complete | yes | yes | partial | unit, pgTAP | Step 1 foundation |
 | Profiles | Bio, academic field, graduation privacy, interests | incomplete | yes | yes | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
-| Profiles | Visibility and activity sections | incomplete | yes | partial | partial | pgTAP | Step 1 foundation; Step 2 UX |
+| Profiles | Visibility and activity sections | complete | yes | yes | partial | unit, pgTAP, authenticated E2E | Step 1 foundation; Step 2A complete |
 | Profiles | Mutual friends and organization memberships | incomplete | partial | partial | partial | pgTAP | Required |
 | Profiles | Safe same-campus/network projections without email | incomplete | yes | yes | partial | pgTAP | Step 1 harden |
 | Friends | Send/accept/decline/cancel/remove | complete | yes | yes | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
@@ -38,8 +38,8 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Organizations | Posts, events, discussions, reporting/suspension | incomplete | partial | partial | no | pgTAP | Required |
 | Social | Profile and organization text/image posts | incomplete | yes | partial | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
 | Social | Campus/network/friends visibility | complete | yes | yes | yes | pgTAP | Step 1 foundation |
-| Social | Reactions, comments, replies, edit, soft delete | incomplete | partial | partial | partial | contract, pgTAP | Required |
-| Social | Visibility-aware paginated feeds | complete | yes | yes | partial | pgTAP | Step 1 foundation; Step 2 UX |
+| Social | Reactions, comments, replies, edit, soft delete | complete | yes | yes | partial | contract, unit, pgTAP, authenticated E2E | Step 2A complete |
+| Social | Visibility-aware paginated feeds | complete | yes | yes | partial | unit, pgTAP, authenticated E2E | Step 1 foundation; Step 2A complete |
 | Search | Marketplace search | complete | yes | yes | partial | unit, pgTAP | Required |
 | Search | People and discussion search | incomplete | yes | yes | partial | unit, pgTAP | Required |
 | Search | Unified multi-entity search | complete | yes | yes | partial | contract, pgTAP | Step 1 foundation; Step 2 UX |
@@ -73,5 +73,7 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 - Step 1 moves every `Step 1 complete`, `Step 1 foundation`, `Step 1 harden`, and `Step 1 gate` row to the required readiness without shipping disconnected UI.
 - Step 2 completes the user-facing friends, organizations, social feed, expanded profiles, unified search, and notification workflows on web and mobile clients.
 - Step 3 finishes operational hardening, release validation, production smoke, performance measurement, store/deployment readiness, and any remaining `partial` coverage.
+
+Step 2A specifically completes the web Profile/Social ownership and discovery experience. The combined profile-and-organization posting row remains incomplete until organization-authored creation is connected in the organization management UX. Automated content moderation is not part of Step 2A and is tracked separately as Step 2B.
 
 No row may be marked complete based only on a schema, mock screen, or visual component. Completion requires an integrated authorized path, working empty/loading/error states, and the listed minimum automated coverage.

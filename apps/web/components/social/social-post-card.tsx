@@ -2,10 +2,11 @@
 
 import { Heart, Lightbulb, MessageCircle, MoreHorizontal, PartyPopper, ShieldPlus } from "lucide-react";
 import Link from "next/link";
+import * as React from "react";
 import { useState } from "react";
-import { ConfirmationDialog, Dialog, DropdownMenu } from "@/components/ui-interactive";
-import { UserAvatar } from "@/components/user-avatar";
-import type { SocialPostView } from "@/lib/social";
+import { ConfirmationDialog, Dialog, DropdownMenu } from "../ui-interactive";
+import { UserAvatar } from "../user-avatar";
+import type { SocialPostView } from "../../lib/social";
 import { SocialPostComposer } from "./social-post-composer";
 import { SocialReportAction } from "./social-report-action";
 

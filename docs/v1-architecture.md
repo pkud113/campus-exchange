@@ -114,6 +114,8 @@ Search/filter listings, inspect visibility and exchange methods, favorite or req
 
 Create a profile post or post as an authorized organization role, choose allowed visibility, attach private media, and receive reactions/comments. Join or request membership in an organization, accept invitations, RSVP to organization events, and participate without gaining administrative privileges.
 
+On web, the personal profile is the canonical creation and ownership surface. Social is a composer-free discovery feed, Home may show a read-only preview, and every surface consumes the same RLS-authorized post projection. Profile peer views are Posts, Listings, Events, Organizations, and About; their desktop tab row never wraps and narrow viewports scroll it horizontally.
+
 ### Discussions
 
 Join a campus-private community, create a text/link/image post, vote, save, comment to depth eight, report abuse, and observe tombstones after deletion. Community and campus moderation stay separate.
