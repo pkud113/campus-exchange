@@ -5,7 +5,8 @@ const communitySlug = /^[a-z0-9_]{3,32}$/;
 const internalOrigin = "https://campus-exchange.internal";
 
 function fallbackFor(kind?: string) {
-  if (kind === "message" || kind === "message_request") return "/messages";
+  if (kind === "message") return "/messages";
+  if (kind === "message_request") return "/messages/requests";
   if (kind === "discussion") return "/discussions?unavailable=1";
   if (kind === "listing" || kind === "favorite") return "/marketplace";
   if (kind === "event") return "/events";
@@ -56,8 +57,10 @@ export function notificationHref(rawHref: string | null | undefined, kind?: stri
   if (url.pathname === "/messages" || url.pathname === "/messages/requests") {
     const conversationId = url.searchParams.get("conversation");
     if (conversationId && uuid.test(conversationId)) return `/messages?conversation=${conversationId}`;
-    const view = url.pathname === "/messages/requests" ? "incoming" : url.searchParams.get("view");
-    return view === "incoming" || view === "sent" ? `/messages?view=${view}` : "/messages";
+    const view = url.searchParams.get("box") ?? url.searchParams.get("view") ?? (url.pathname === "/messages/requests" ? "incoming" : null);
+    if (view === "incoming") return "/messages/requests";
+    if (view === "sent") return "/messages/requests?box=sent";
+    return "/messages";
   }
 
   if (url.pathname === "/admin" || url.pathname.startsWith("/reports/")) {

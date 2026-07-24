@@ -1,5 +1,13 @@
 # Campus Exchange production runbook
 
+## Step 2C rollout and rollback
+
+Deploy the notification worker before applying the three Step 2C additive migrations. Keep `universal_onboarding_enabled` false through schema rollout, deploy the web artifact, and verify grant minting (with completion disabled), moderation AAL2 denials, worker backward compatibility, and directory search health. Enable onboarding only through the allowlisted operational-setting action so the actor, reason, idempotency key, and before-state are audited.
+
+Production smoke coverage must include all three `umich.edu` selections, an existing launched institution, a previously unprovisioned active/open institution, denial of consumer/disposable mailboxes, grant replay/expiry, campus immutability, and campus/platform staff-scope denials. Confirm the selected institution ID, assignment basis, campus reuse/provisioning result, timezone provenance, and verification-history row.
+
+Forward-only rollback disables `universal_onboarding_enabled` and, when necessary, `network_institution_discovery_enabled`, then redeploys the compatible worker/web artifacts. Do not drop grants, verification history, category preferences, reactions, operational cases, audit records, or any other additive Step 2C schema.
+
 ## Release boundary
 
 Production is `https://campus-exchange.net`, the Supabase project is `campus-exchange`, and the Cloudflare Workers are `campus-exchange-web` and `campus-exchange-worker`. The NCES IPEDS directory makes 6,072 institutions searchable but grants no access by itself. Campus and exact-domain activation remains operator controlled: the reviewed v1 domain set activates its documented 17 colleges transactionally; every later campus/domain defaults inactive or unreviewed. Staff accounts are invitation-only and may use domains outside the student allowlist.

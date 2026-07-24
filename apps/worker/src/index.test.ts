@@ -34,7 +34,7 @@ describe("worker delivery helpers", () => {
     expect(shouldSuppressDiscussionNotification({ actorId: "a", recipientId: "b" })).toBe(false);
   });
   it("canonicalizes network interaction routes",()=>{
-    expect(interactionNotificationCopy("conversation_request.created",{} )?.href).toBe("/messages?view=incoming");
+    expect(interactionNotificationCopy("conversation_request.created",{} )?.href).toBe("/messages/requests?view=incoming");
     expect(interactionNotificationCopy("conversation_request.accepted",{conversationId:"11111111-1111-1111-1111-111111111111"})?.href).toContain("conversation=");
     expect(interactionNotificationCopy("event.rsvp_created",{eventId:"22222222-2222-2222-2222-222222222222"})?.href).toBe("/events?event=22222222-2222-2222-2222-222222222222");
     expect(interactionNotificationCopy("moderation.report_resolved",{})?.href).toBe("/notifications");
@@ -43,6 +43,7 @@ describe("worker delivery helpers", () => {
     ["friend.requested", "friend_request", "/friends?tab=incoming"],
     ["friend.accepted", "friend_accepted", "/friends"],
     ["organization.invited", "organization_invitation", "/organizations/robotics-club"],
+    ["organization.channel_reaction", "organization_membership", "/organizations"],
     ["social.reacted", "social_reaction", "/social?post=11111111-1111-1111-1111-111111111111"],
     ["social.commented", "social_comment", "/social?post=11111111-1111-1111-1111-111111111111"],
     ["social.replied", "social_reply", "/social?post=11111111-1111-1111-1111-111111111111"],

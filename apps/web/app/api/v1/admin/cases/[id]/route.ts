@@ -1,9 +1,9 @@
-import { apiData, apiError, requireStaff } from "@/lib/api";
+import { apiData, apiError, requireStaffCapability } from "@/lib/api";
 import { NextResponse } from "next/server";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, { params }: Params) {
-  const context = await requireStaff(request); if (context instanceof NextResponse) return context;
+  const context = await requireStaffCapability(request, "cases.read"); if (context instanceof NextResponse) return context;
   const { id } = await params;
   const { data: selected, error } = await context.supabase.from("moderation_cases").select("*").eq("id", id).single();
   if (error || !selected) return apiError(request, 404, "not_found", "Moderation case not found.");

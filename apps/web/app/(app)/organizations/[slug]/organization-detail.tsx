@@ -17,13 +17,14 @@ type Role = { id: string; builtin_key: string | null; name: string; color: strin
 type PermissionOverride = { channel_id: string; role_id?: string; profile_id?: string; view_channel: boolean | null; send_messages: boolean | null; manage_messages: boolean | null; create_announcements: boolean | null };
 type RoleAssignment = { role_id: string; profile_id: string };
 type ViewerCapabilities = { can_manage_roles: boolean; can_assign_roles: boolean; can_manage_channels: boolean; can_view_audit: boolean };
-type Message = { id: string; author_profile_id: string | null; parent_message_id: string | null; body: string | null; edited_at: string | null; deleted_at: string | null; created_at: string; author: { handle?: string; display_name?: string | null; avatar_media_id?: string | null } | null };
+type Message = { id: string; author_profile_id: string | null; parent_message_id: string | null; body: string | null; edited_at: string | null; deleted_at: string | null; created_at: string; author: { handle?: string; display_name?: string | null; avatar_media_id?: string | null } | null; reactions: Array<{ emoji: string; count: number; reactedByViewer: boolean }> };
 type Organization = {
   id: string; slug: string; name: string; description: string; rules: string; organization_type: string; visibility: string; membership_policy: string;
   member_count: number; website_url: string | null; avatar_media_id: string | null; banner_media_id: string | null; is_read_only: boolean;
   campuses: { name?: string; short_name?: string } | Array<{ name?: string; short_name?: string }>;
   members: Member[]; membershipQueue: ManagedMembership[]; viewerMembership: { profile_id: string; role: string; status: string } | null;
   viewerCapabilities: ViewerCapabilities | null;
+  notificationPreferences: { announcements: boolean; mentions: boolean; membership_changes: boolean; muted_until: string | null } | null;
   upcomingEvents: Array<{ id: string; title: string; location: string; starts_at: string; cancelled_at: string | null }>;
   recentPosts: Array<{ id: string; body: string; reaction_count: number; comment_count: number; created_at: string }>;
 };
@@ -99,6 +100,7 @@ export function OrganizationDetail({ slug }: { slug: string }) {
     const supabase = createSupabaseBrowserClient();
     const subscription = supabase.channel(`organization:${org?.id}:channel:${activeChannelId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "organization_channel_messages", filter: `channel_id=eq.${activeChannelId}` }, () => void loadMessages(activeChannelId))
+      .on("postgres_changes", { event: "*", schema: "public", table: "organization_channel_message_reactions", filter: `channel_id=eq.${activeChannelId}` }, () => void loadMessages(activeChannelId))
       .subscribe((status) => { if (status === "SUBSCRIBED") void loadMessages(activeChannelId); });
     return () => { void supabase.removeChannel(subscription); };
   }, [activeChannelId, loadMessages, org?.id, showHome]);
@@ -195,6 +197,17 @@ export function OrganizationDetail({ slug }: { slug: string }) {
     if (response.ok && activeChannel) await loadMessages(activeChannel.id);
   }
 
+  async function toggleReaction(message: Message, emoji: string) {
+    const response = await fetch(`/api/v1/organizations/messages/${message.id}/reactions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ emoji })
+    });
+    const json = await response.json();
+    if (!response.ok) setNotice(json.error?.message ?? "Unable to update reaction.");
+    else setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactions: json.data.reactions } : item));
+  }
+
   if (loading && !org) return <div className="workspace-loading" aria-live="polite">Loading organization workspace…</div>;
   if (!org) return <><Link className="back-link" href="/organizations"><ArrowLeft /> Organizations</Link><EmptyState icon={<Building2 />} title={notice || "Organization unavailable"} /></>;
   const sidebar = <aside className={`workspace-sidebar ${drawer ? "open" : ""}`}>
@@ -216,7 +229,7 @@ export function OrganizationDetail({ slug }: { slug: string }) {
         <div className="channel-messages">
           {nextCursor && <button className="button button-ghost button-small" onClick={() => loadMessages(activeChannel.id, nextCursor)}>Load older messages</button>}
           {!messages.length && <EmptyState icon={activeChannel.channel_type === "announcement" ? <Megaphone /> : <Hash />} title="No messages yet" description={activeChannel.canSend ? "Start the conversation in this channel." : "Authorized roles can publish here."} compact />}
-          {messages.map((message) => <article className="channel-message" key={message.id}><UserAvatar name={message.author?.display_name ?? message.author?.handle ?? "Former member"} mediaId={message.author?.avatar_media_id ?? null} /><div><header><strong>{message.author?.display_name ?? message.author?.handle ?? "Former member"}</strong><small>{new Date(message.created_at).toLocaleString()}{message.edited_at ? " · edited" : ""}</small></header>{message.parent_message_id && <span className="reply-context">Reply</span>}<p>{message.deleted_at ? "Message deleted" : message.body}</p>{!message.deleted_at && <div className="channel-message-actions">{activeChannel.canSend && <button className="text-button" onClick={() => setReplyTo(message)}>Reply</button>}{message.author_profile_id === org.viewerMembership?.profile_id && <button className="text-button" onClick={() => manageMessage(message, "edit")}>Edit</button>}{(message.author_profile_id === org.viewerMembership?.profile_id || activeChannel.canManageMessages) && <button className="text-button" onClick={() => manageMessage(message, "delete")}>Delete</button>}<ReportButton targetType="organization_message" targetId={message.id} label="Report" className="text-button" /></div>}</div></article>)}
+          {messages.map((message) => <article className="channel-message" key={message.id}><UserAvatar name={message.author?.display_name ?? message.author?.handle ?? "Former member"} mediaId={message.author?.avatar_media_id ?? null} /><div><header><strong>{message.author?.display_name ?? message.author?.handle ?? "Former member"}</strong><small>{new Date(message.created_at).toLocaleString()}{message.edited_at ? " · edited" : ""}</small></header>{message.parent_message_id && <span className="reply-context">Reply</span>}<p>{message.deleted_at ? "Message deleted" : message.body}</p>{!message.deleted_at && <><div className="channel-reactions">{message.reactions.map((reaction) => <button key={reaction.emoji} className={reaction.reactedByViewer ? "active" : ""} aria-pressed={reaction.reactedByViewer} onClick={() => toggleReaction(message, reaction.emoji)}>{reaction.emoji} {reaction.count}</button>)}{["👍","❤️","😂","🎉","👀","🙌"].filter((emoji) => !message.reactions.some((reaction) => reaction.emoji === emoji)).slice(0,2).map((emoji) => <button key={emoji} aria-label={`React ${emoji}`} onClick={() => toggleReaction(message, emoji)}>{emoji}</button>)}</div><div className="channel-message-actions">{activeChannel.canSend && <button className="text-button" onClick={() => setReplyTo(message)}>Reply</button>}{message.author_profile_id === org.viewerMembership?.profile_id && <button className="text-button" onClick={() => manageMessage(message, "edit")}>Edit</button>}{(message.author_profile_id === org.viewerMembership?.profile_id || activeChannel.canManageMessages) && <button className="text-button" onClick={() => manageMessage(message, "delete")}>Delete</button>}<ReportButton targetType="organization_message" targetId={message.id} label="Report" className="text-button" /></div></>}</div></article>)}
         </div>
         <form className="channel-composer" onSubmit={sendMessage}>{replyTo && <div className="composer-reply"><span>Replying to {replyTo.author?.display_name ?? replyTo.author?.handle ?? "member"}</span><button type="button" onClick={() => setReplyTo(null)}><X /></button></div>}<div><input aria-label={`Message ${activeChannel.name}`} value={messageBody} onChange={(event) => setMessageBody(event.target.value)} maxLength={4000} placeholder={activeChannel.canSend ? `Message #${activeChannel.name}` : "This channel is read-only for your role"} disabled={!activeChannel.canSend} /><button aria-label="Send message" disabled={!activeChannel.canSend || !messageBody.trim()}><Send /></button></div></form>
       </> : <EmptyState icon={<Hash />} title="Choose a channel" />}
@@ -234,7 +247,24 @@ export function OrganizationDetail({ slug }: { slug: string }) {
     </aside>
     {adminOpen && <WorkspaceAdministration slug={slug} roles={roles} members={org.members} channels={channels} roleOverrides={roleOverrides} memberOverrides={memberOverrides} roleAssignments={roleAssignments} capabilities={viewerCapabilities} onChanged={loadWorkspace} onClose={() => setAdminOpen(false)} />}
     {creatingChannel && <div className="composer-modal-layer" role="presentation"><button className="mobile-drawer-backdrop" aria-label="Close channel creator" onClick={() => setCreatingChannel(false)} /><form className="composer-modal listing-form workspace-channel-form" role="dialog" aria-modal="true" aria-labelledby="channel-create-title" onSubmit={createChannel}><header><div><span className="overline">WORKSPACE SETTINGS</span><h2 id="channel-create-title">Create a channel</h2></div><button type="button" aria-label="Close" onClick={() => setCreatingChannel(false)}><X /></button></header><label>Category<select name="categoryId" defaultValue={categories[0]?.id ?? ""}><option value="">No category</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label><label>Channel name<input name="name" pattern="[a-z0-9][a-z0-9-]{1,49}" minLength={2} maxLength={50} required /></label><label>Description<textarea name="description" maxLength={500} /></label><div className="form-grid"><label>Type<select name="type"><option value="text">Text</option><option value="announcement">Announcement</option></select></label><label>Visibility<select name="visibility"><option value="standard">All members</option><option value="restricted">Restricted</option></select></label><label>Slow mode (seconds)<input name="slowModeSeconds" type="number" min={0} max={21600} defaultValue={0} /></label></div><fieldset><legend>Roles allowed in restricted channels</legend>{roles.filter((role) => role.builtin_key !== "owner").map((role) => <label className="checkbox-label" key={role.id}><input type="checkbox" name="allowedRoleIds" value={role.id} /> <span style={{ color: role.color }}>{role.name}</span></label>)}</fieldset><div className="form-actions"><button type="button" className="button button-ghost" onClick={() => setCreatingChannel(false)}>Cancel</button><button className="button button-primary">Create channel</button></div></form></div>}
+    {org.notificationPreferences && <OrganizationNotifications slug={org.slug} initial={org.notificationPreferences} />}
   </div>;
+}
+
+function OrganizationNotifications({ slug, initial }: { slug: string; initial: NonNullable<Organization["notificationPreferences"]> }) {
+  const [preferences, setPreferences] = useState(initial);
+  const [notice, setNotice] = useState("");
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const response = await fetch(`/api/v1/organizations/${slug}/notification-preferences`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ announcements: preferences.announcements, mentions: preferences.mentions, membershipChanges: preferences.membership_changes, mutedUntil: preferences.muted_until })
+    });
+    const json = await response.json();
+    setNotice(response.ok ? "Notification preferences saved." : json.error?.message ?? "Unable to save preferences.");
+  }
+  return <section className="organization-notifications"><h2>Notifications</h2><form className="form-grid" onSubmit={save}><label className="checkbox-label"><input type="checkbox" checked={preferences.announcements} onChange={(event) => setPreferences({ ...preferences, announcements: event.target.checked })} /> Announcements</label><label className="checkbox-label"><input type="checkbox" checked={preferences.mentions} onChange={(event) => setPreferences({ ...preferences, mentions: event.target.checked })} /> Mentions</label><label className="checkbox-label"><input type="checkbox" checked={preferences.membership_changes} onChange={(event) => setPreferences({ ...preferences, membership_changes: event.target.checked })} /> Membership changes</label><label className="full">Mute until<input type="datetime-local" value={preferences.muted_until?.slice(0, 16) ?? ""} onChange={(event) => setPreferences({ ...preferences, muted_until: event.target.value ? new Date(event.target.value).toISOString() : null })} /></label><button className="button button-primary">Save</button>{notice && <p className="form-notice full" role="status">{notice}</p>}</form></section>;
 }
 
 function OrganizationHome({ org, canManage, onMembership }: { org: Organization; canManage: boolean; onMembership: (action: "request" | "accept" | "decline" | "cancel" | "remove") => void }) {

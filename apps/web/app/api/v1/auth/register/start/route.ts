@@ -28,6 +28,59 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (institutionError) throw institutionError;
     if (!institution) return apiError(request, 400, "bad_request", "Select a college from the directory.");
+    if (institution.status !== "active" || institution.registration_status !== "open") {
+      return apiError(request, 403, "forbidden", "Registration is not open for this institution.", {
+        outcome: "CAMPUS_REGISTRATION_PAUSED",
+        institution: institution.name,
+        domain
+      });
+    }
+    const { data: universalSetting } = await admin.from("runtime_settings")
+      .select("value")
+      .eq("key", "universal_onboarding_enabled")
+      .maybeSingle();
+    const universalEnabled = universalSetting?.value === true;
+    if (universalEnabled) {
+      const requesterHash = await sha256(clientAddress);
+      const emailHash = await sha256(input.email);
+      const { data: grantRows, error: grantError } = await admin.rpc("create_registration_enrollment_grant", {
+        selected_institution_id: institution.id,
+        normalized_email_hash: emailHash,
+        normalized_email_domain: domain,
+        normalized_requester_hash: requesterHash
+      });
+      if (grantError) {
+        const denied = grantError.message.includes("consumer") || grantError.message.includes("disposable");
+        return apiError(request, denied ? 403 : 400, denied ? "forbidden" : "bad_request", denied
+          ? "Use an institution-issued mailbox. Consumer and disposable email providers are not eligible."
+          : "This institution and email combination is not eligible for registration.");
+      }
+      const grant = grantRows?.[0] as { grant_id: string; assignment_basis: string; expires_at: string } | undefined;
+      if (!grant) throw new Error("enrollment_grant_not_created");
+      const { error: otpError } = await admin.auth.signInWithOtp({
+        email: input.email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${process.env.APP_ORIGIN ?? new URL(request.url).origin}/auth/callback`,
+          data: { registrationGrantId: grant.grant_id }
+        }
+      });
+      if (otpError?.code === "over_email_send_rate_limit" || otpError?.code === "over_request_rate_limit") {
+        return apiError(request, 429, "rate_limited", "Too many verification emails were requested. Wait briefly and retry.");
+      }
+      if (otpError) throw otpError;
+      return apiData(request, {
+        sent: true,
+        verificationKind: "registration",
+        grantId: grant.grant_id,
+        expiresAt: grant.expires_at,
+        assignmentBasis: grant.assignment_basis,
+        outcome: "UNIVERSAL_VERIFICATION_REQUIRED" as const,
+        message: "Verify the one-time code to join the selected institution.",
+        institution: institution.name,
+        domain
+      });
+    }
     const { data: resolutions, error: resolutionError } = await admin.rpc("registration_domain_resolution", { input_domain: domain });
     if (resolutionError) throw resolutionError;
     const resolution = resolutions?.[0] as { resolution?: string; campus_id?: string; campus_name?: string } | undefined;

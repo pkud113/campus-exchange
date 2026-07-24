@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "./supabase/server";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "./supabase/server";
 
 const listingSelect =
   "id,campus_id,seller_id,title,description,category,condition,price_cents,currency,status,visibility,exchange_methods,legacy_exchange_unspecified,created_at,campuses!inner(name,short_name,slug)";
@@ -62,7 +62,21 @@ function decodeMarketplaceCursor(value?: string): MarketplaceCursor | null {
   }
 }
 
-export async function loadMarketplacePage(filters?: { q?: string; category?: string; sort?: string; campus?: string; cursor?: string }) {
+async function resolveInstitutionCampus(
+  db: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+  institution: string | undefined
+) {
+  if (!institution || institution === "my") {
+    const { data: profile } = await db.from("profiles").select("campus_id").eq("id", userId).single();
+    return profile?.campus_id ?? null;
+  }
+  if (institution === "all") return null;
+  const { data } = await createSupabaseAdminClient().from("institution_directory").select("campus_id").eq("id", institution).maybeSingle();
+  return data?.campus_id ?? "unprovisioned";
+}
+
+export async function loadMarketplacePage(filters?: { q?: string; category?: string; sort?: string; institution?: string; cursor?: string }) {
   try {
     const db = await createSupabaseServerClient();
     const { data: { user } } = await db.auth.getUser();
@@ -75,10 +89,9 @@ export async function loadMarketplacePage(filters?: { q?: string; category?: str
       .eq("status", "active")
       .is("deleted_at", null)
       .limit(25);
-    if (!filters?.campus || filters.campus === "my") {
-      const { data: profile } = await db.from("profiles").select("campus_id").eq("id", user.id).single();
-      if (profile?.campus_id) query = query.eq("campus_id", profile.campus_id);
-    } else if (filters.campus !== "all") query = query.eq("campuses.slug", filters.campus);
+    const selectedCampus = await resolveInstitutionCampus(db, user.id, filters?.institution);
+    if (selectedCampus === "unprovisioned") return { listings: [], nextCursor: null };
+    if (selectedCampus) query = query.eq("campus_id", selectedCampus);
     if (filters?.q) query = query.textSearch("search_vector", filters.q, { type: "websearch", config: "english" });
     if (filters?.category) query = query.eq("category", filters.category);
     if (sort === "price_asc") query = query.order("price_cents", { ascending: true }).order("id", { ascending: true });
@@ -103,7 +116,7 @@ export async function loadMarketplacePage(filters?: { q?: string; category?: str
   }
 }
 
-export async function loadEvents(filters?: { campus?: string }) {
+export async function loadEvents(filters?: { institution?: string }) {
   try {
     const db = await createSupabaseServerClient();
     const { data: { user } } = await db.auth.getUser();
@@ -116,10 +129,9 @@ export async function loadEvents(filters?: { campus?: string }) {
       .gte("starts_at", new Date().toISOString())
       .order("starts_at")
       .limit(12);
-    if (!filters?.campus || filters.campus === "my") {
-      const { data: profile } = await db.from("profiles").select("campus_id").eq("id", user.id).single();
-      if (profile?.campus_id) query = query.eq("campus_id", profile.campus_id);
-    } else if (filters.campus !== "all") query = query.eq("campuses.slug", filters.campus);
+    const selectedCampus = await resolveInstitutionCampus(db, user.id, filters?.institution);
+    if (selectedCampus === "unprovisioned") return [];
+    if (selectedCampus) query = query.eq("campus_id", selectedCampus);
     const { data, error } = await query;
     if (error || !data) return [];
     const [{ data: profiles }, { data: counts }] = await Promise.all([

@@ -18,6 +18,19 @@ test("registration exposes searchable college and school-email controls", async 
   await expect(page.getByLabel(/school.*email/i)).toBeVisible();
 });
 
+test("institution combobox supports asynchronous keyboard selection", async ({ page }) => {
+  await page.goto("/register");
+  const combobox = page.getByRole("combobox", { name: "College or university" });
+  await combobox.fill("University of Michigan Ann Arbor");
+  await expect(page.getByRole("option").first()).toBeVisible();
+  await expect(combobox).toHaveAttribute("aria-expanded", "true");
+  await combobox.press("ArrowDown");
+  await expect(combobox).toHaveAttribute("aria-activedescendant", /option-0$/);
+  await combobox.press("Enter");
+  await expect(combobox).toHaveValue(/University of Michigan/i);
+  await expect(combobox).toHaveAttribute("aria-expanded", "false");
+});
+
 test("theme and keyboard focus remain usable across the public shell", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => localStorage.setItem("campus-theme", "dark"));

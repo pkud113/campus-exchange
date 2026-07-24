@@ -2,12 +2,18 @@ import { organizationInputSchema } from "@campus-exchange/contracts";
 import { apiData, apiError, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { authorizeSharedTextMutation } from "@/lib/content-moderation";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const context = await requireVerified(request); if (context instanceof NextResponse) return context;
-  const url = new URL(request.url); const q = url.searchParams.get("q")?.trim(); const campus = url.searchParams.get("campus") ?? "my";
+  const url = new URL(request.url); const q = url.searchParams.get("q")?.trim(); const institution = url.searchParams.get("institution") ?? url.searchParams.get("campus") ?? "my";
   let query = context.supabase.from("organizations").select("id,campus_id,created_by,slug,name,description,website_url,avatar_media_id,banner_media_id,visibility,membership_policy,status,is_official,verified_at,member_count,created_at,campuses!inner(name,short_name,slug)").eq("status", "active").order("member_count", { ascending: false }).limit(50);
-  if (campus === "my") query = query.eq("campus_id", context.campusId); else if (campus !== "all") query = query.eq("campuses.slug", campus);
+  if (institution === "my") query = query.eq("campus_id", context.campusId);
+  else if (institution !== "all") {
+    const { data: campus } = await createSupabaseAdminClient().from("campuses").select("id").eq("institution_id", institution).maybeSingle();
+    if (!campus) return apiData(request, []);
+    query = query.eq("campus_id", campus.id);
+  }
   if (q) query = query.ilike("name", `%${q.replace(/[%_,()]/g, "")}%`);
   const { data, error } = await query;
   return error ? apiError(request, 500, "internal_error", "Unable to load organizations.") : apiData(request, data ?? []);
