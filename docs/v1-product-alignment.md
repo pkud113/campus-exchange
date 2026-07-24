@@ -74,13 +74,9 @@ Custom role storage and channel member overrides exist as secure extension point
 
 Every exposed table has RLS. Browser roles receive read or narrow self-update grants only; writes use authenticated, rate-limited APIs and locked functions. Definer helpers use an empty search path, fully qualified objects, internal scope checks, and revoked public execution.
 
-## Step 2 work
+## Step 2 completion
 
-- Add the dedicated authenticated Playwright fixture project described in the Step 1 plan, then cover every profile privacy/block state and organization authority persona end-to-end without production credentials.
-- Complete a full custom-role editor and channel member-override settings experience before advertising either feature.
-- Add channel message reactions and richer organization notification-preference settings if product validation keeps them in scope.
-- Expand moderation queue facets with operator directories, saved views, related-case grouping, and appeal disposition workflows; the current core queue/action/appeal path remains authoritative.
-- Add richer saved/archive management only when the backing product lifecycle is complete.
+Step 2C completes the authenticated Playwright fixture project, profile/network and organization-authority personas, custom-role and channel-override settings, channel reactions, granular organization/category notification preferences, scoped operator directories, saved queue views, related-case grouping, and appeal disposition workflows. The integrated implementation and release evidence are recorded in [the Step 2C record](./v1-step-2c.md).
 
 ## Step 3 mobile and release work
 

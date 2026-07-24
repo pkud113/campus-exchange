@@ -1,5 +1,13 @@
 # Multi-campus design and operating contract
 
+## Step 2C universal verified onboarding
+
+The institution directory, not a client-provided campus UUID or editable Auth metadata, is now the selection authority. Registration creates an opaque, one-time server grant bound to the normalized email hash and exact selected directory institution. The trusted OTP completion path rechecks the Auth email, consumes the grant, and then reuses or lazily provisions the campus.
+
+Shared institutional domains remain explicit choices. In particular, `umich.edu` can resolve to Ann Arbor, Dearborn, or Flint only through the selected directory institution; the verification record retains both `shared_selected` and the exact UNITID. Existing members and campus-bound content are never bulk reassigned, and no self-service campus-switch path is introduced.
+
+New campuses use a documented predominant regional IANA timezone with `region_default` provenance until a platform administrator applies an override. Disabled campuses may be enabled on successful verification while active/open, but explicit suspension or closure always fails closed.
+
 ## Verified repository facts
 
 - Campus membership remains mandatory on profiles and cannot be changed through authenticated profile grants.

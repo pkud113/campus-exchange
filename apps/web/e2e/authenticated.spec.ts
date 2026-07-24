@@ -210,9 +210,11 @@ test("owner can create and assign a custom role, set role/member overrides, and 
     const createdBody = await created.json();
     expect(created.ok(), JSON.stringify(createdBody)).toBe(true);
   } else {
-    const answers = [`Release Helper ${testInfo.project.name}`, "#476657", "20", "70", "view_organization,view_channels,send_messages"];
-    page.on("dialog", async (dialog) => dialog.accept(answers.shift() ?? ""));
     await page.getByRole("button", { name: "Create custom role" }).click();
+    await page.getByLabel("Role name").fill(`Release Helper ${testInfo.project.name}`);
+    await page.getByLabel("Authority rank").fill("20");
+    await page.getByLabel("Display order").fill("70");
+    await page.getByRole("button", { name: "Create role" }).click();
     await expect(page.getByText(`Release Helper ${testInfo.project.name}`)).toBeVisible();
   }
   const [workspaceResponse, organizationResponse] = await Promise.all([
@@ -254,41 +256,42 @@ test("student appeal surface and MFA-protected moderation appeal handling are av
   await student.context.close();
 
   const staff = await pageFor(browser, "platformModerator");
-  await staff.page.goto("/admin");
+  await staff.page.goto("/admin?section=cases");
   await expect(staff.page.getByRole("heading", { name: "Safety center" })).toBeVisible();
   await expect(staff.page.getByText(/Platform scope.*MFA protected/)).toBeVisible();
   await expect(staff.page.getByRole("heading", { name: "Appeal review" })).toBeVisible();
-  const assignReviewer = staff.page.getByRole("button", { name: "Assign reviewer" });
-  await expect(assignReviewer).toBeVisible();
+  const disposition = staff.page.getByLabel("Disposition").first();
+  await expect(disposition).toBeVisible();
   if (testInfo.project.name === "desktop-chromium") {
-    const answers = ["Independent reviewer assigned during authenticated release testing.", ""];
-    staff.page.on("dialog", async (dialog) => dialog.accept(answers.shift() ?? ""));
-    await assignReviewer.click();
+    await disposition.selectOption("assign");
+    await staff.page.getByLabel("Internal reasoning").first().fill("Independent reviewer assigned during authenticated release testing.");
+    await staff.page.getByRole("button", { name: "Submit disposition" }).first().click();
     await expect(staff.page.getByRole("status")).toContainText("Appeal updated");
   }
   await staff.context.close();
 });
 
-test("registration preserves the University of Michigan shared-domain decision", async ({ page }) => {
+test("registration preserves all University of Michigan shared-domain selections", async ({ page }) => {
   const institutions = await page.request.get("/api/v1/institutions?q=University%20of%20Michigan&limit=20");
   expect(institutions.ok()).toBe(true);
   const directory = await institutions.json();
-  const annArbor = directory.data.find((entry: { name: string }) => entry.name.includes("Ann Arbor"));
-  expect(annArbor).toBeTruthy();
-  const response = await page.request.post("/api/v1/auth/register/start", {
-    headers: { origin: "http://127.0.0.1:3100", "content-type": "application/json" },
-    data: { institutionId: annArbor.id, email: "ce.e2e.shared@umich.edu", turnstileToken: "local-e2e" },
-  });
-  const body = await response.json();
-  if (response.ok()) {
-    expect(body.data.outcome).toBe("AMBIGUOUS_OR_SHARED_DOMAIN");
-    expect(body.data.domain).toBe("umich.edu");
-  } else {
-    expect(response.status(), JSON.stringify(body)).toBe(503);
-    expect(body.error.details).toMatchObject({
-      outcome: "GLOBAL_SERVICE_UNAVAILABLE",
-      registrationOutcome: "AMBIGUOUS_OR_SHARED_DOMAIN",
-      domain: "umich.edu",
+  const expected = [
+    ["ipeds:170976", "ann-arbor"],
+    ["ipeds:171137", "dearborn"],
+    ["ipeds:171146", "flint"]
+  ] as const;
+  for (const [institutionId, suffix] of expected) {
+    expect(directory.data.items.some((entry: { id: string }) => entry.id === institutionId)).toBe(true);
+    const response = await page.request.post("/api/v1/auth/register/start", {
+      headers: { origin: "http://127.0.0.1:3100", "content-type": "application/json" },
+      data: { institutionId, email: `ce.e2e.${suffix}.${Date.now()}@umich.edu`, turnstileToken: "local-e2e" },
+    });
+    const body = await response.json();
+    expect(response.ok(), JSON.stringify(body)).toBe(true);
+    expect(body.data).toMatchObject({
+      outcome: "UNIVERSAL_VERIFICATION_REQUIRED",
+      assignmentBasis: "shared_selected",
+      domain: "umich.edu"
     });
   }
 });

@@ -16,11 +16,26 @@ export async function GET(request: Request, { params }: Params) {
   const { data, error } = await query;
   if (error) return apiError(request, 404, "not_found", "Channel unavailable.");
   const rows = data ?? []; const page = rows.slice(0, parsed.data.limit); const authorIds = page.flatMap((row) => row.author_profile_id ? [row.author_profile_id] : []);
-  const { data: authors } = authorIds.length ? await context.supabase.rpc("safe_profile_cards", { target_ids: authorIds }) : { data: [] };
+  const [{ data: authors }, { data: reactions }] = await Promise.all([
+    authorIds.length ? context.supabase.rpc("safe_profile_cards", { target_ids: authorIds }) : Promise.resolve({ data: [] }),
+    page.length ? context.supabase.from("organization_channel_message_reactions").select("message_id,profile_id,emoji").in("message_id", page.map((row) => row.id)) : Promise.resolve({ data: [] })
+  ]);
   const authorMap = new Map((authors ?? []).map((author: any) => [author.id, author]));
+  const reactionMap = new Map<string, Array<{ emoji: string; count: number; reactedByViewer: boolean }>>();
+  for (const reaction of reactions ?? []) {
+    const summaries = reactionMap.get(reaction.message_id) ?? [];
+    const existing = summaries.find((summary) => summary.emoji === reaction.emoji);
+    if (existing) {
+      existing.count += 1;
+      existing.reactedByViewer ||= reaction.profile_id === context.userId;
+    } else {
+      summaries.push({ emoji: reaction.emoji, count: 1, reactedByViewer: reaction.profile_id === context.userId });
+      reactionMap.set(reaction.message_id, summaries);
+    }
+  }
   await context.supabase.rpc("mark_organization_channel_read", { target_channel: channelId });
   const last = page.at(-1);
-  return apiData(request, { items: page.reverse().map((row) => ({ ...row, author: row.author_profile_id ? authorMap.get(row.author_profile_id) ?? null : null })), nextCursor: rows.length > parsed.data.limit && last ? encodeCursor(last.created_at, last.id) : null });
+  return apiData(request, { items: page.reverse().map((row) => ({ ...row, author: row.author_profile_id ? authorMap.get(row.author_profile_id) ?? null : null, reactions: reactionMap.get(row.id) ?? [] })), nextCursor: rows.length > parsed.data.limit && last ? encodeCursor(last.created_at, last.id) : null });
 }
 
 export async function POST(request: Request, { params }: Params) {

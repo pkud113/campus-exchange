@@ -103,6 +103,7 @@ export default async function globalSetup() {
   const highFriend = profileIds.studentA < profileIds.studentB ? profileIds.studentB : profileIds.studentA;
   const sql = `
 begin;
+update public.runtime_settings set value='true'::jsonb where key='universal_onboarding_enabled';
 delete from public.organizations where slug='${e2eOrganization.slug}';
 delete from public.moderation_cases where report_id in (select id from public.reports where reporter_id in (${fixtureIds}));
 delete from public.reports where reporter_id in (${fixtureIds});

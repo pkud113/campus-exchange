@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { ApiErrorCode } from "@campus-exchange/contracts";
+import type { AdminScope, StaffCapability } from "@campus-exchange/shared-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { discussionErrorStatus, mutationOriginStatus, requireBooleanSetting, trustedRequestId } from "@/lib/api-rules";
@@ -69,6 +70,36 @@ export async function requireStaff(request: Request, allowed: string[] = ["moder
   const {data:aal}=await context.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if(aal?.currentLevel!=="aal2")return apiError(request,403,"forbidden","Multi-factor authentication is required for staff actions.");
   return context;
+}
+
+export type StaffContext = VerifiedContext & {
+  staff: {
+    actorId: string;
+    campusId: string;
+    scope: AdminScope["kind"];
+    platformRole: "platform_admin" | "platform_moderator" | null;
+    campusRole: "admin" | "moderator" | null;
+    capabilities: StaffCapability[];
+    aal: "aal2";
+  };
+};
+
+export async function requireStaffCapability(
+  request: Request,
+  capability: StaffCapability
+): Promise<StaffContext | NextResponse> {
+  const context = await requireVerified(request);
+  if (context instanceof NextResponse) return context;
+  const { data: aal } = await context.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.currentLevel !== "aal2") {
+    return apiError(request, 403, "forbidden", "Multi-factor authentication is required for every privileged operation.");
+  }
+  const { data, error } = await context.supabase.rpc("staff_access_context");
+  const staff = data as StaffContext["staff"] | null;
+  if (error || !staff?.capabilities?.includes(capability)) {
+    return apiError(request, 403, "forbidden", "This staff role does not have the required capability in this scope.");
+  }
+  return { ...context, staff };
 }
 
 export async function parseJson<T>(request: Request, schema: { safeParse: (value: unknown) => { success: boolean; data?: T; error?: { flatten: () => unknown } } }): Promise<T | NextResponse> {

@@ -12,24 +12,58 @@ type Capabilities = { can_manage_roles: boolean; can_assign_roles: boolean; can_
 type AuditEvent = { id: number; actor_handle: string | null; actor_display_name: string | null; action: string; target_type: string; target_id: string; reason: string | null; created_at: string };
 
 const permissions = ["view_organization","view_channels","send_messages","manage_messages","create_announcements","manage_channels","manage_roles","assign_roles","invite_members","approve_membership_requests","remove_members","ban_members","manage_organization_profile","create_organization_events","create_organization_posts","view_audit_log"];
+const permissionGroups = {
+  "Access & messaging": ["view_organization","view_channels","send_messages","manage_messages","create_announcements"],
+  "Workspace administration": ["manage_channels","manage_roles","assign_roles","manage_organization_profile","view_audit_log"],
+  "Membership": ["invite_members","approve_membership_requests","remove_members","ban_members"],
+  "Publishing": ["create_organization_events","create_organization_posts"]
+};
 const state = (value: boolean | null | undefined) => value === true ? "allow" : value === false ? "deny" : "inherit";
 
 export function WorkspaceAdministration({ slug, roles, members, channels, roleOverrides, memberOverrides, roleAssignments, capabilities, onChanged, onClose }: { slug: string; roles: Role[]; members: Member[]; channels: Channel[]; roleOverrides: Override[]; memberOverrides: Override[]; roleAssignments: Assignment[]; capabilities: Capabilities; onChanged: () => Promise<void>; onClose: () => void }) {
   const [section, setSection] = useState<"roles" | "permissions" | "audit">("roles");
   const [notice, setNotice] = useState("");
+  const [roleDraft, setRoleDraft] = useState<Role | null>(null);
   const [audit, setAudit] = useState<AuditEvent[]>([]); const [auditCursor, setAuditCursor] = useState<string | null>(null); const [auditLoading, setAuditLoading] = useState(false);
   const [channelId, setChannelId] = useState(channels[0]?.id ?? ""); const [targetType, setTargetType] = useState<"role" | "member">("role"); const [targetId, setTargetId] = useState(roles.find((role) => role.builtin_key !== "owner")?.id ?? "");
   const currentOverride = useMemo(() => (targetType === "role" ? roleOverrides : memberOverrides).find((item) => item.channel_id === channelId && (targetType === "role" ? item.role_id : item.profile_id) === targetId), [channelId, memberOverrides, roleOverrides, targetId, targetType]);
   const activeChannel = channels.find((channel) => channel.id === channelId);
 
-  async function roleMutation(action: "create" | "update" | "delete", role?: Role) {
-    const name = action === "delete" ? role?.name ?? "Custom role" : window.prompt("Role name", role?.name ?? "Custom role"); if (!name) return;
-    const color = action === "delete" ? role?.color ?? "#476657" : window.prompt("Badge color (#RRGGBB)", role?.color ?? "#476657"); if (!color) return;
-    const authorityRank = action === "delete" ? role?.authority_rank ?? 20 : Number(window.prompt("Authority rank (1-99, below your own)", String(role?.authority_rank ?? 20))); if (!Number.isInteger(authorityRank)) return;
-    const sortPosition = action === "delete" ? role?.sort_position ?? 50 : Number(window.prompt("Display order", String(role?.sort_position ?? roles.length * 10))); if (!Number.isInteger(sortPosition)) return;
-    const selectedPermissions = action === "delete" ? role?.permissions ?? [] : (window.prompt("Comma-separated permissions", (role?.permissions ?? ["view_organization","view_channels","send_messages"]).join(",")) ?? "").split(",").map((value) => value.trim()).filter((value) => permissions.includes(value));
-    const response = await fetch(`/api/v1/organizations/${slug}/roles`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, roleId: role?.id ?? null, name, color, authorityRank, sortPosition, permissions: selectedPermissions }) });
-    const json = await response.json(); setNotice(response.ok ? `Custom role ${action}d.` : json.error?.message ?? "Unable to update role."); if (response.ok) await onChanged();
+  async function roleMutation(action: "create" | "update" | "delete", role: Role) {
+    const response = await fetch(`/api/v1/organizations/${slug}/roles`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action,
+        roleId: role.id || null,
+        name: role.name,
+        color: role.color,
+        authorityRank: role.authority_rank,
+        sortPosition: role.sort_position,
+        permissions: role.permissions
+      })
+    });
+    const json = await response.json();
+    setNotice(response.ok ? `Custom role ${action === "create" ? "created" : action === "update" ? "updated" : "deleted"}.` : json.error?.message ?? "Unable to update role.");
+    if (response.ok) {
+      setRoleDraft(null);
+      await onChanged();
+    }
+  }
+
+  async function submitRole(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!roleDraft) return;
+    const form = new FormData(event.currentTarget);
+    const nextRole: Role = {
+      ...roleDraft,
+      name: String(form.get("name") ?? "").trim(),
+      color: String(form.get("color") ?? "").toUpperCase(),
+      authority_rank: Number(form.get("authorityRank")),
+      sort_position: Number(form.get("sortPosition")),
+      permissions: form.getAll("permissions").map(String).filter((permission) => permissions.includes(permission))
+    };
+    await roleMutation(roleDraft.id ? "update" : "create", nextRole);
   }
 
   async function assignment(role: Role, profileId: string, action: "assign" | "remove") {
@@ -52,7 +86,64 @@ export function WorkspaceAdministration({ slug, roles, members, channels, roleOv
   useEffect(() => { if (section === "audit" && capabilities.can_view_audit && !audit.length) void loadAudit(); }, [audit.length, capabilities.can_view_audit, loadAudit, section]);
 
   return <div className="composer-modal-layer" role="presentation"><button className="mobile-drawer-backdrop" aria-label="Close workspace settings" onClick={onClose} /><section className="composer-modal workspace-admin" role="dialog" aria-modal="true" aria-labelledby="workspace-admin-title"><header><div><span className="overline">WORKSPACE ADMINISTRATION</span><h2 id="workspace-admin-title">Roles, permissions &amp; audit</h2></div><button aria-label="Close" onClick={onClose}><X /></button></header><nav aria-label="Administration sections">{capabilities.can_manage_roles && <button className={section === "roles" ? "active" : ""} onClick={() => setSection("roles")}>Roles</button>}{capabilities.can_manage_channels && <button className={section === "permissions" ? "active" : ""} onClick={() => setSection("permissions")}>Channel permissions</button>}{capabilities.can_view_audit && <button className={section === "audit" ? "active" : ""} onClick={() => setSection("audit")}>Audit history</button>}</nav>
-    {section === "roles" && <div className="workspace-admin-list"><div className="workspace-admin-heading"><h3>Organization roles</h3><button className="button button-primary button-small" onClick={() => void roleMutation("create")}>Create custom role</button></div>{roles.map((role) => <article key={role.id}><span className="role-color" style={{ backgroundColor: role.color }} /><div><strong>{role.name}</strong><small>{role.builtin_key ? "Built-in role" : "Custom role"} · authority {role.authority_rank} · order {role.sort_position}</small><p>{role.permissions.join(" · ")}</p></div>{!role.builtin_key && <div><button className="text-button" onClick={() => void roleMutation("update", role)}>Edit</button><button className="text-button" onClick={() => void roleMutation("delete", role)}>Delete</button></div>}<details><summary>Member assignments</summary>{members.map((member) => { const assigned = roleAssignments.some((item) => item.role_id === role.id && item.profile_id === member.profile_id); return <label key={member.profile_id}><span>{member.display_name ?? member.handle}</span><button className="text-button" disabled={!capabilities.can_assign_roles || Boolean(role.builtin_key)} onClick={() => void assignment(role, member.profile_id, assigned ? "remove" : "assign")}>{assigned ? "Remove" : "Assign"}</button></label>; })}</details></article>)}</div>}
+    {section === "roles" && <div className="workspace-admin-list">
+      <div className="workspace-admin-heading">
+        <h3>Organization roles</h3>
+        <button className="button button-primary button-small" onClick={() => setRoleDraft({
+          id: "", builtin_key: null, name: "Custom role", color: "#476657",
+          authority_rank: 20, sort_position: roles.length * 10,
+          permissions: ["view_organization","view_channels","send_messages"], is_assignable: true
+        })}>Create custom role</button>
+      </div>
+      {roleDraft && <form className="workspace-role-form" onSubmit={submitRole}>
+        <h4>{roleDraft.id ? `Edit ${roleDraft.name}` : "Create custom role"}</h4>
+        <div className="form-grid">
+          <label>Role name<input name="name" defaultValue={roleDraft.name} minLength={2} maxLength={60} required /></label>
+          <label>Badge color<input name="color" type="color" defaultValue={roleDraft.color} required /></label>
+          <label>Authority rank<input name="authorityRank" type="number" min={1} max={99} defaultValue={roleDraft.authority_rank} required /></label>
+          <label>Display order<input name="sortPosition" type="number" min={0} max={10000} defaultValue={roleDraft.sort_position} required /></label>
+        </div>
+        <p className="privacy-note">A role can only grant permissions below the editor’s effective authority. The server rejects escalation.</p>
+        {Object.entries(permissionGroups).map(([group, groupPermissions]) => <fieldset key={group}>
+          <legend>{group}</legend>
+          {groupPermissions.map((permission) => <label className="checkbox-label" key={permission}>
+            <input name="permissions" type="checkbox" value={permission} defaultChecked={roleDraft.permissions.includes(permission)} />
+            <span>{permission.replaceAll("_", " ")}</span>
+          </label>)}
+        </fieldset>)}
+        <div className="resolved-permissions">
+          <ShieldCheck />
+          <span><strong>Effective authority preview</strong><small>Rank {roleDraft.authority_rank}. Selected permissions are checked again against your own resolved roles when saved and assigned.</small></span>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="button button-ghost" onClick={() => setRoleDraft(null)}>Cancel</button>
+          <button className="button button-primary">{roleDraft.id ? "Save role" : "Create role"}</button>
+        </div>
+      </form>}
+      {roles.map((role) => {
+        const assignmentCount = roleAssignments.filter((item) => item.role_id === role.id).length;
+        return <article key={role.id}>
+          <span className="role-color" style={{ backgroundColor: role.color }} />
+          <div>
+            <strong>{role.name}</strong>
+            <small>{role.builtin_key ? "Built-in role" : "Custom role"} · authority {role.authority_rank} · order {role.sort_position}</small>
+            <p>{role.permissions.join(" · ")}</p>
+            {!role.builtin_key && assignmentCount > 0 && <small>Remove {assignmentCount} assignment{assignmentCount === 1 ? "" : "s"} before deletion.</small>}
+          </div>
+          {!role.builtin_key && <div>
+            <button className="text-button" onClick={() => setRoleDraft(role)}>Edit</button>
+            <button className="text-button" disabled={assignmentCount > 0} onClick={() => void roleMutation("delete", role)}>Delete</button>
+          </div>}
+          <details>
+            <summary>Member assignments ({assignmentCount})</summary>
+            {members.map((member) => {
+              const assigned = roleAssignments.some((item) => item.role_id === role.id && item.profile_id === member.profile_id);
+              return <label key={member.profile_id}><span>{member.display_name ?? member.handle}</span><button className="text-button" disabled={!capabilities.can_assign_roles || Boolean(role.builtin_key)} onClick={() => void assignment(role, member.profile_id, assigned ? "remove" : "assign")}>{assigned ? "Remove" : "Assign"}</button></label>;
+            })}
+          </details>
+        </article>;
+      })}
+    </div>}
     {section === "permissions" && <form className="workspace-permission-form" onSubmit={saveOverride}><h3>Channel override</h3><label>Channel<select value={channelId} onChange={(event) => setChannelId(event.target.value)}>{channels.map((channel) => <option value={channel.id} key={channel.id}>#{channel.name}</option>)}</select></label><label>Override target<select value={targetType} onChange={(event) => { const value = event.target.value as "role" | "member"; setTargetType(value); setTargetId(value === "role" ? roles.find((role) => role.builtin_key !== "owner")?.id ?? "" : members[0]?.profile_id ?? ""); }}><option value="role">Role</option><option value="member">Member</option></select></label><label>{targetType === "role" ? "Role" : "Member"}<select value={targetId} onChange={(event) => setTargetId(event.target.value)}>{targetType === "role" ? roles.filter((role) => role.builtin_key !== "owner").map((role) => <option value={role.id} key={role.id}>{role.name} ({role.builtin_key ? "built-in" : "custom"})</option>) : members.map((member) => <option value={member.profile_id} key={member.profile_id}>{member.display_name ?? member.handle}</option>)}</select></label>{[["viewChannel","View channel",currentOverride?.view_channel],["sendMessages","Send messages",currentOverride?.send_messages],["manageMessages","Manage messages",currentOverride?.manage_messages],["createAnnouncements","Create announcements",currentOverride?.create_announcements]].map(([name,label,value]) => <label key={String(name)}>{String(label)}<select name={String(name)} defaultValue={state(value as boolean | null | undefined)} key={`${channelId}:${targetType}:${targetId}:${String(name)}`}><option value="inherit">Inherit</option><option value="allow">Explicit allow</option><option value="deny">Explicit deny</option></select></label>)}<div className="resolved-permissions"><ShieldCheck /><span><strong>Your resolved access for #{activeChannel?.name}</strong><small>View {activeChannel?.canView ? "allowed" : "denied"} · Send {activeChannel?.canSend ? "allowed" : "denied"} · Manage {activeChannel?.canManageMessages ? "allowed" : "denied"} · Announcements {activeChannel?.canCreateAnnouncements ? "allowed" : "denied"}</small></span></div><button className="button button-primary">Save override</button></form>}
     {section === "audit" && <div className="workspace-audit"><h3>Organization audit history</h3>{!auditLoading && !audit.length && <p>No audit events yet.</p>}{audit.map((event) => <article key={event.id}><span>{event.action.replaceAll(".", " ")}</span><strong>{event.actor_display_name ?? event.actor_handle ?? "System"}</strong><p>{event.target_type} · {event.target_id}{event.reason ? ` · ${event.reason}` : ""}</p><time>{new Date(event.created_at).toLocaleString()}</time></article>)}{auditCursor && <button className="button button-ghost" disabled={auditLoading} onClick={() => void loadAudit(auditCursor)}>{auditLoading ? "Loading…" : "Load older events"}</button>}</div>}
     {notice && <p className="form-notice" role="status">{notice}</p>}

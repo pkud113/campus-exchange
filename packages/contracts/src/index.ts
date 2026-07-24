@@ -34,6 +34,9 @@ export function safeInternalRedirectPath(value: unknown): string | null {
 export const institutionIdSchema = z.string().regex(/^ipeds:[0-9]{6}$/);
 export const institutionSearchSchema = z.object({
   q: z.string().trim().max(120).default(""),
+  lifecycle: z.enum(["active", "all"]).default("active"),
+  presence: z.enum(["any", "provisioned", "unprovisioned"]).default("any"),
+  cursor: z.string().trim().max(240).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20)
 });
 export const registrationStartSchema = z.object({
@@ -61,12 +64,41 @@ export const onboardingInputSchema = z.object({ username: usernameSchema, passwo
 export const passwordResetStartSchema = z.object({ identifier: loginIdentifierSchema, turnstileToken: turnstileTokenSchema });
 export const passwordResetCompleteSchema = z.object({ password: passwordSchema });
 export const notificationPreferenceInputSchema = z.object({
-  emailMessages: z.boolean(),
-  emailDiscussions: z.boolean(),
+  categories: z.record(z.enum([
+    "friend_request", "friend_accepted", "message", "message_request",
+    "social_reaction", "social_comment", "social_reply",
+    "organization_invitation", "organization_membership", "event_activity",
+    "discussion_activity", "moderation_activity", "security_activity"
+  ]), z.object({ inApp: z.boolean(), email: z.boolean() })).optional(),
+  emailMessages: z.boolean().optional(),
+  emailDiscussions: z.boolean().optional(),
   quietHoursStart: z.number().int().min(0).max(23).nullable(),
   quietHoursEnd: z.number().int().min(0).max(23).nullable()
 }).strict().refine((value) => (value.quietHoursStart === null) === (value.quietHoursEnd === null), { message: "Set both quiet-hour values or neither." })
   .refine((value) => value.quietHoursStart === null || value.quietHoursStart !== value.quietHoursEnd, { message: "Quiet hours must cover less than a full day." });
+
+export const enrollmentGrantCompletionSchema = z.object({ grantId: uuidSchema }).strict();
+export const institutionFilterSchema = z.union([z.enum(["my", "all"]), institutionIdSchema]).default("my");
+export const friendBoxQuerySchema = z.object({
+  box: z.enum(["all", "incoming", "sent"]).default("all"),
+  cursor: uuidSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20)
+});
+export const messageRequestBoxQuerySchema = z.object({
+  box: z.enum(["incoming", "sent"]).default("incoming"),
+  cursor: uuidSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20)
+});
+export const channelReactionInputSchema = z.object({
+  emoji: z.string().trim().min(1).max(16)
+}).strict();
+export const auditedAdminActionSchema = z.object({
+  action: z.string().trim().regex(/^[a-z][a-z0-9_.-]{2,79}$/),
+  targetType: z.string().trim().regex(/^[a-z][a-z0-9_.-]{1,49}$/),
+  targetId: z.string().trim().min(1).max(160),
+  reason: z.string().trim().min(10).max(2000),
+  idempotencyKey: uuidSchema
+}).strict();
 
 export const listingStatusSchema = z.enum(["draft", "active", "reserved", "sold", "withdrawn"]);
 export type ListingStatus = z.infer<typeof listingStatusSchema>;
@@ -481,7 +513,9 @@ export const socialCommentMutationSchema = z.object({ action: z.enum(["edit", "d
   if (value.action === "edit" && !value.body) context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Edited comments require text" });
 });
 
-export const unifiedSearchQuerySchema = searchQuery.extend({ campus: z.string().trim().toLowerCase().max(80).optional() });
+export const unifiedSearchQuerySchema = searchQuery.extend({
+  institution: institutionFilterSchema.default("my")
+});
 export const notificationCategorySchema = z.enum([
   "friend_request", "friend_accepted", "message", "message_request", "social_reaction", "social_comment", "social_reply",
   "organization_invitation", "organization_membership", "event_activity", "discussion_activity", "moderation_activity", "security_activity",

@@ -29,6 +29,6 @@ describe("multi-campus contracts",()=>{
     expect(registrationStartSchema.safeParse({institutionId,email:"student@msu.edu",campusId:id}).success).toBe(false);
     expect(registrationStartSchema.safeParse({email:"student@msu.edu"}).success).toBe(false);
     expect(schoolRequestVerifySchema.safeParse({challengeId:id,email:"student@unknown.edu",code:"123456"}).success).toBe(true);
-    expect(institutionSearchSchema.parse({q:"Michigan",limit:"10"})).toEqual({q:"Michigan",limit:10});
+    expect(institutionSearchSchema.parse({q:"Michigan",limit:"10"})).toEqual({q:"Michigan",lifecycle:"active",presence:"any",limit:10});
   });
 });

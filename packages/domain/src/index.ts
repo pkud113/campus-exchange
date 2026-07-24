@@ -28,6 +28,7 @@ export function normalizeSchoolDomain(email: string): string {
 export type InstitutionRegistrationDecision = Exclude<RegistrationOutcome, "VERIFICATION_REQUEST_PENDING" | "GLOBAL_SERVICE_UNAVAILABLE">;
 
 export const registrationOutcomeMessages: Record<RegistrationOutcome, string> = {
+  UNIVERSAL_VERIFICATION_REQUIRED: "Verify this institutional mailbox to provision or join the selected institution.",
   SUPPORTED_AND_OPEN: "This school and email domain are approved. Continue to verify your school email.",
   DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED: "Your school is in the Campus Exchange directory, but this email domain has not been approved for registration yet.",
   AMBIGUOUS_OR_SHARED_DOMAIN: "This email domain cannot currently be assigned safely to one campus. Registration will remain unavailable until the domain mapping is reviewed.",

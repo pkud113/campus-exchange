@@ -6,16 +6,17 @@ import { RsvpButton } from "./rsvp-button";
 import { PageHeader } from "@/components/ui";
 import { redirect } from "next/navigation";
 import { MessageRequestComposer } from "@/components/message-request-composer";
+import { InstitutionFilter } from "@/components/institution-filter";
 export const metadata = { title: "Campus events" };
-export default async function Events({ searchParams }: { searchParams: Promise<{ event?: string; campus?: string }> }) {
-  const { event: targetEventId, campus = "my" } = await searchParams;
-  const events = await loadEvents({ campus });
+export default async function Events({ searchParams }: { searchParams: Promise<{ event?: string; institution?: string }> }) {
+  const { event: targetEventId, institution = "my" } = await searchParams;
+  const events = await loadEvents({ institution });
   const db = await createSupabaseServerClient();
   const {
     data: { user },
   } = await db.auth.getUser();
   if (!user) redirect("/sign-in?next=/events");
-  const [{ data: rsvps }, { data: campuses }] = await Promise.all([events.length
+  const { data: rsvps } = events.length
     ? await db
         .from("event_rsvps")
         .select("event_id")
@@ -24,7 +25,7 @@ export default async function Events({ searchParams }: { searchParams: Promise<{
           "event_id",
           events.map((event) => event.id),
         )
-    : { data: [] }, db.from("campuses").select("name,short_name,slug").eq("status","enabled").order("name")]);
+    : { data: [] };
   const attending = new Set((rsvps ?? []).map((item) => item.event_id));
   return (
     <main className="dashboard">
@@ -34,7 +35,7 @@ export default async function Events({ searchParams }: { searchParams: Promise<{
         description="Discover campus events and events intentionally shared across the campus network."
         actions={<Link className="button button-primary" href="/events/new"><Plus /> Create event</Link>}
       />
-      <form className="campus-filter" action="/events"><label>Campus<select name="campus" defaultValue={campus}><option value="my">My campus</option><option value="all">All campuses</option>{(campuses??[]).map((item:any)=><option value={item.slug} key={item.slug}>{item.short_name??item.name}</option>)}</select></label><button className="button button-ghost button-small">Apply</button></form>
+      <InstitutionFilter value={institution} />
       {targetEventId && !events.some((event) => event.id === targetEventId) && <p className="discussion-notice" role="status">That event is no longer available. Here are the current campus events.</p>}
       {events.length ? (
         <div className="event-grid">
