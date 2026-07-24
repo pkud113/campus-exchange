@@ -1,12 +1,13 @@
 import { contentDeletionSchema, discussionCommentUpdateSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, discussionMutationError, parseJson, requireDiscussions, verifyMutationOrigin } from "@/lib/api";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 type Params = { params: Promise<{ commentId: string }> };
 export async function PATCH(request: Request, { params }: Params) {
   const origin = verifyMutationOrigin(request); if (origin) return origin;
   const context = await requireDiscussions(request); if (context instanceof NextResponse) return context;
   const input = await parseJson(request, discussionCommentUpdateSchema); if (input instanceof NextResponse) return input;
-  const { commentId } = await params; const { data, error } = await context.supabase.rpc("update_discussion_comment", { target_comment: commentId, submitted_body: input.body });
+  const { commentId } = await params; const moderation=await authorizeSharedTextMutation(request,context,{surface:"discussion_comment",operation:"edit",fields:{body:input.body},targetId:commentId});if(moderation instanceof Response)return moderation; const { data, error } = await context.supabase.rpc("update_discussion_comment", { target_comment: commentId, submitted_body: input.body });
   return error ? discussionMutationError(request, error, "Unable to update this comment.") : apiData(request, data);
 }
 export async function DELETE(request: Request, { params }: Params) {

@@ -1,6 +1,6 @@
 export const openApiDocument = {
   openapi: "3.1.0",
-  info: { title: "Campus Exchange API", version: "1.4.0", description: "Versioned API for verified multi-campus marketplace, social profiles, organization workspaces, moderation, events, people, and private messaging clients." },
+  info: { title: "Campus Exchange API", version: "1.5.0", description: "Versioned API for verified multi-campus marketplace, social profiles, organization workspaces, fail-closed shared-text moderation, events, people, and private messaging clients." },
   servers: [{ url: "/api/v1" }],
   security: [{ cookieAuth: [] }],
   components: {
@@ -24,6 +24,7 @@ export const openApiDocument = {
       DiscussionComment: { type:"object",required:["id","postId","depth","score","replyCount","createdAt"],properties:{id:{type:"string",format:"uuid"},postId:{type:"string",format:"uuid"},authorId:{type:["string","null"],format:"uuid"},parentCommentId:{type:["string","null"],format:"uuid"},depth:{type:"integer",minimum:0,maximum:8},body:{type:["string","null"],maxLength:10000},score:{type:"integer"},replyCount:{type:"integer",minimum:0},createdAt:{type:"string",format:"date-time"},children:{type:"array",items:{}}} },
       DiscussionVote: { type:"object",required:["value"],properties:{value:{type:["integer","null"],enum:[-1,1,null]}} },
       DiscussionModeration: { type:"object",required:["action","targetType","targetId","reason","idempotencyKey"],properties:{action:{enum:["pin_post","unpin_post","lock_post","unlock_post","remove_post","restore_post","remove_comment","restore_comment","ban_member","unban_member","add_moderator","remove_moderator","archive","unarchive"]},targetType:{enum:["community","post","comment","member"]},targetId:{type:"string",format:"uuid"},reason:{type:"string",minLength:3,maxLength:1000},idempotencyKey:{type:"string",format:"uuid"}} }
+      ,ContentModerationReview: { type:"object",required:["checkId","idempotencyKey"],properties:{checkId:{type:"string",format:"uuid"},idempotencyKey:{type:"string",format:"uuid"}} }
     }
   },
   paths: {
@@ -64,10 +65,10 @@ export const openApiDocument = {
     "/search": { get:{summary:"Search safe profile, listing, organization, event, discussion, and social projections",responses:{"200":{description:"Unified search results"}}} },
     "/me/listings": { get:{summary:"List the current member's listings",responses:{"200":{description:"Listings"}}} },
     "/me/events": { get:{summary:"List the current member's events",responses:{"200":{description:"Events"}}} },
-    "/conversation-requests": { get:{summary:"List incoming or sent message requests",responses:{"200":{description:"Requests"}}},post:{summary:"Create an idempotent direct, listing, or event request with an opening message",requestBody:{required:true,content:{"application/json":{schema:{$ref:"#/components/schemas/ConversationRequestInput"}}}},responses:{"201":{description:"Request created"}}} },
+    "/conversation-requests": { get:{summary:"List incoming or sent message requests",responses:{"200":{description:"Requests"}}},post:{summary:"Create an idempotent private request; opening messages are explicitly excluded from automated scanning",requestBody:{required:true,content:{"application/json":{schema:{$ref:"#/components/schemas/ConversationRequestInput"}}}},responses:{"201":{description:"Request created"}}} },
     "/conversation-requests/{id}": { patch:{summary:"Accept or decline a request",responses:{"200":{description:"Updated"}}},delete:{summary:"Cancel an outgoing request",responses:{"200":{description:"Cancelled"}}} },
     "/conversations": { get:{summary:"List conversations",responses:{"200":{description:"Conversations"}}},post:{summary:"Start or recover a listing conversation",responses:{"201":{description:"Conversation"}}} },
-    "/conversations/{id}/messages": { get:{summary:"Recover persisted messages",responses:{"200":{description:"Messages"}}},post:{summary:"Send a message",responses:{"201":{description:"Message"}}} },
+    "/conversations/{id}/messages": { get:{summary:"Recover persisted messages",responses:{"200":{description:"Messages"}}},post:{summary:"Send a private direct message excluded from automated scanning",responses:{"201":{description:"Message"}}} },
     "/conversations/{id}/read": { post:{summary:"Update participant last-read time",responses:{"200":{description:"Read state updated"}}} },
     "/reports": { post:{summary:"Report content or behavior",responses:{"201":{description:"Report"}}} },
     "/discussions/home": { get:{summary:"Get joined, trending, popular, and newest campus discussion feeds",responses:{"200":{description:"Private discussion home"},"403":{description:"Discussions disabled",content:{"application/json":{schema:{$ref:"#/components/schemas/Error"}}}}}} },
@@ -99,5 +100,6 @@ export const openApiDocument = {
     ,"/admin/cases/{id}": { get:{summary:"Get protected case evidence, timeline, actions, and appeals",responses:{"200":{description:"Moderation case"}}} }
     ,"/admin/cases/{id}/action": { post:{summary:"Apply a reasoned, audited, optionally reversible moderation action",responses:{"200":{description:"Action recorded"}}} }
     ,"/moderation/appeals": { get:{summary:"List the affected member's appealable cases",responses:{"200":{description:"Appealable cases"}}},post:{summary:"Submit an idempotent appeal",responses:{"201":{description:"Appeal submitted"}}} }
+    ,"/moderation/content-reviews": { post:{summary:"Request staff review of a blocked or ambiguous shared-text decision without resending the draft",requestBody:{required:true,content:{"application/json":{schema:{$ref:"#/components/schemas/ContentModerationReview"}}}},responses:{"201":{description:"Review case created or reused"}}} }
   }
 } as const;

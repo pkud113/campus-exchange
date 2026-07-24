@@ -1347,9 +1347,9 @@ svg { flex: 0 0 auto; }
 .profile-page { display: grid; gap: 0; }
 .profile-tab-scroller { position: relative; z-index: 2; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; border-inline: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); box-shadow: var(--elevation-1); scroll-snap-type: x proximity; }
 .profile-tab-list { min-width: max-content; display: grid; grid-template-columns: repeat(5, minmax(148px, 1fr)); }
-.profile-tab-list button { min-height: 64px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-weight: 800; white-space: nowrap; scroll-snap-align: center; }
-.profile-tab-list button svg { width: 19px; }
-.profile-tab-list button[aria-selected="true"] { border-bottom-color: var(--green); background: linear-gradient(to top, color-mix(in srgb,var(--accent-soft) 58%,transparent), transparent 70%); color: var(--green); }
+.profile-tab-list a { min-height: 64px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-weight: 800; white-space: nowrap; scroll-snap-align: center; text-decoration: none; }
+.profile-tab-list a svg { width: 19px; }
+.profile-tab-list a[aria-selected="true"] { border-bottom-color: var(--green); background: linear-gradient(to top, color-mix(in srgb,var(--accent-soft) 58%,transparent), transparent 70%); color: var(--green); }
 .profile-tab-panel { padding-top: 22px; outline: none; }
 .profile-posts-layout,.profile-post-list { display: grid; gap: 15px; }
 .profile-post-composer { padding: 22px; margin-bottom: 5px; scroll-margin-top: 90px; }
@@ -1379,7 +1379,7 @@ svg { flex: 0 0 auto; }
   .profile-page { padding-inline: 12px; }
   .profile-tab-scroller { margin-inline: -12px; border-inline: 0; }
   .profile-tab-list { grid-template-columns: repeat(5,minmax(132px,auto)); }
-  .profile-tab-list button { min-height: 56px; }
+  .profile-tab-list a { min-height: 56px; }
   .profile-post-composer { padding: 16px; }
 }
 

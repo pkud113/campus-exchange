@@ -228,7 +228,7 @@ export const discussionOwnershipSchema = z.object({
   idempotencyKey: uuidSchema
 });
 
-export type ApiErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "service_unconfigured" | "internal_error";
+export type ApiErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "service_unconfigured" | "content_blocked" | "content_review_required" | "moderation_unavailable" | "internal_error";
 export type ApiError = { error: { code: ApiErrorCode; message: string; requestId: string; details?: unknown } };
 export type ApiPage<T> = { data: T[]; page: { nextCursor: string | null } };
 
@@ -435,7 +435,7 @@ export const organizationChannelOverrideSchema = z.object({
 }).strict();
 
 export const moderationCaseActionSchema = z.object({
-  action: z.enum(["dismiss", "warn", "hide_content", "remove_content", "restore_content", "restrict_content", "lock_content", "temporary_account_restriction", "suspend", "restore", "ban_account", "restrict_organization", "suspend_organization", "remove_organization", "restrict_channel", "delete_channel_message", "remove_organization_role", "remove_organization_member", "restrict_community", "remove_listing", "cancel_event", "escalate", "request_information"]),
+  action: z.enum(["dismiss", "warn", "hide_content", "remove_content", "restore_content", "restrict_content", "lock_content", "temporary_account_restriction", "suspend", "restore", "ban_account", "restrict_organization", "suspend_organization", "remove_organization", "restrict_channel", "delete_channel_message", "remove_organization_role", "remove_organization_member", "restrict_community", "remove_listing", "cancel_event", "escalate", "request_information", "approve_content", "uphold_block"]),
   reason: z.string().trim().min(3).max(1000),
   userMessage: z.string().trim().min(3).max(1000).nullable().default(null),
   restrictionUntil: utcDateSchema.nullable().default(null),
@@ -445,6 +445,8 @@ export const moderationAppealSchema = z.object({
   statement: z.string().trim().min(20).max(4000),
   idempotencyKey: uuidSchema,
 }).strict();
+
+export const contentModerationReviewSchema = z.object({ checkId: uuidSchema, idempotencyKey: uuidSchema }).strict();
 
 export const moderationAppealDecisionSchema = z.object({
   action: z.enum(["assign", "approve", "reject", "request_information"]),

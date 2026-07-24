@@ -50,8 +50,9 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 | Notifications | V1 category taxonomy | complete | yes | yes | yes | worker unit, pgTAP | Step 1 foundation |
 | Safety | Global blocking | complete | yes | yes | partial | pgTAP | Required |
 | Safety | Reporting and protected snapshots | complete | yes | yes | partial | contract, pgTAP | Required |
+| Safety | Fail-closed automated moderation for public/shared text | complete | yes | yes | no | unit, contract, pgTAP, authenticated E2E | Required; Step 2B complete; private messaging excluded |
 | Moderation | Campus/platform roles, AAL2, audit | complete | yes | yes | partial | contract, pgTAP | Required |
-| Moderation | Unified cases, evidence, organization/social actions, appeals/reversal | complete core | yes | yes | partial | contract, pgTAP | Required; advanced queue facets Step 2 |
+| Moderation | Unified cases, protected automated evidence, actions, appeals/reversal | complete | yes | yes | partial | contract, pgTAP | Required; Step 2B complete |
 | Registration | Precise institution/domain outcome codes and copy | complete | yes | yes | partial | contract, unit, pgTAP, public E2E | Required |
 | Navigation | Consistent desktop shell | complete | n/a | yes | n/a | unit | Step 1 complete |
 | Navigation | Mobile bottom nav/drawer | complete | n/a | yes | partial | unit, desktop/mobile E2E | Step 1 complete |
@@ -76,6 +77,6 @@ The release column distinguishes Step 1 foundations from Step 2 complete feature
 - Step 2 completes the remaining custom-role/member-override settings, advanced moderation queue facets, authenticated end-to-end fixture coverage, message-request polish, and optional channel-reaction/notification-preference work listed in [the product-alignment correction](./v1-product-alignment.md).
 - Step 3 finishes operational hardening, release validation, production smoke, performance measurement, store/deployment readiness, and any remaining `partial` coverage.
 
-Step 2A specifically consolidates personal post creation and management on the profile while keeping Social as a composer-free discovery feed. Automated content moderation remains a separate Step 2B deliverable.
+Step 2A consolidates personal post creation and management on the profile while keeping Social as a composer-free discovery feed. Step 2B adds server- and database-enforced shared-text moderation while explicitly leaving private direct messages and message-request opening text unscanned.
 
 No row may be marked complete based only on a schema, mock screen, or visual component. Completion requires an integrated authorized path, working empty/loading/error states, and the listed minimum automated coverage.

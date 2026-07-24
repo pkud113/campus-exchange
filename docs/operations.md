@@ -148,6 +148,7 @@ Deployment is fail-closed: the deploy workflow calls the complete reusable CI jo
 - Upload abuse: spoofed MIME, invalid decoded bytes, >8 MB, seventh listing image, another user’s media, deleted media, and original R2 URL denial.
 - Messaging: direct/listing/event opening request, incoming/sent states, idempotent retry, daily limit, decline cooldown, transactional accept/first-message insertion, global block cancellation, read-only blocked history, unread recovery, and duplicate rejection.
 - Moderation: campus scope for creator-campus content, platform scope for eligible global abuse, denial without role/AAL2, protected report snapshot, staff safeguards, server-derived report routing, and append-only audit entries without message bodies or secrets.
+- Automated text moderation: create and edit representative profile, Social, Discussion, organization/channel, listing, event, and alt-text content; verify allow/block/review/outage outcomes, exact-content overrides, direct-write denial without clearance, provider readiness, and that direct messages and message-request opening text never invoke the provider.
 - Theme/PWA: system default, persisted light/dark override without flash, Turnstile theme, installability, offline public shell, and no offline mutation/private content.
 - Operations: Worker cron health, outbox retry/dead-letter behavior, R2 cleanup, pending-account purge, structured logs without email/message/OTP/signed URL values.
 - Notifications: message/discussion email opt-out, campus-local quiet hours, in-app notification retention, generic email content, and idempotent delivery.
@@ -167,6 +168,8 @@ Supabase Pro supplies daily backups with seven-day retention. The repository bac
 
 The scheduled Worker processes outbox events and maintenance. Pending accounts older than 24 hours are deleted. Listings/events/media soft-delete immediately and are permanently purged after 30 days; R2 objects are removed before media rows. Discussion posts/comments retain structural tombstones but purge bodies, links, private attachments, moderation reasons, and permitted author references after 30 days. Deleted community slugs remain reserved. Ready discussion media that never binds to a target is removed after 24 hours.
 
+Automated moderation decision metadata and unused clearances are purged after 30 days. Allowed text is never retained in moderation storage. Blocked text is stored only as protected evidence for a requested or severe case, then redacted 30 days after final resolution; append-only case/action/audit metadata remains without raw text. The worker performs bounded redaction and purge batches.
+
 ## Monitoring and cost controls
 
 Alert on API 5xx above 2% for five minutes, read p95 above 300 ms, write p95 above 500 ms, oldest outbox event above five minutes, any dead letter, database CPU above 70% for 30 minutes, realtime connections above 400, and reports older than four hours. Monitor slow discussion feed/search queries, vote/save counter drift, cleanup backlog, and community moderation volume. Set projected-cost alerts at $50 and $75. Logs must exclude discussion bodies, message bodies, email addresses, codes, signed URLs, and credentials.
@@ -184,6 +187,10 @@ Disable new cross-campus discovery and global requests with `pnpm campus:admin -
 The migration is additive and backfills existing listings/events to campus-only. Legacy listings keep a truthful unspecified-exchange state until edited. Before deploying a prior web artifact, disable `network_features_enabled` so its campus-only loaders cannot render network rows. Leave the migration applied; added columns have compatible defaults. Legacy no-opening contact RPC signatures remain present but fail closed. A rolled-back client can create a draft with truthful unspecified exchange data, but publishing/materially editing that draft remains disabled until the current exchange-method form is restored. Do not down-migrate or fabricate exchange methods. In a severe messaging incident, retain the forward-compatible worker and investigate outbox/Realtime/RLS state before reopening.
 
 Scale PostgreSQL vertically only after sustained CPU/latency pressure. Keep PostgreSQL search until indexed search misses its target and revisit realtime before 500 concurrent connections.
+
+## Automated moderation rollback
+
+Shared-text writes are fail-closed at the database trigger. A provider outage returns `moderation_unavailable` and preserves the client draft; it never publishes unchecked content. Confirm the Cloudflare Workers AI binding and `/api/health/moderation` readiness probe before reopening writes. Rolling the web application back without a compatible clearance issuer intentionally leaves covered writes blocked while reads and private messaging continue. Do not remove the enforcement triggers or grant an unchecked bypass during an incident; roll forward a compatible web/provider fix. A permanent product retirement requires a separately reviewed forward migration and privacy/retention review.
 
 ## Incident response
 

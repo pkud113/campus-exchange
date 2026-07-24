@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Select, TextArea } from "../ui";
 import { maxImageBytes, normalizedImageType } from "../../lib/images";
 import type { SocialPostView } from "../../lib/social";
+import { ModerationReviewButton, moderationIssueFrom, type ModerationIssue } from "../moderation-review-button";
 
 type SelectedImage = { key: string; file: File; preview: string; alt: string; decorative: boolean; id?: string; error?: string | undefined };
 
@@ -22,6 +23,7 @@ export function SocialPostComposer({ initialPost, networkEnabled = true, autoFoc
   const [images, setImages] = useState<SelectedImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [moderationIssue,setModerationIssue]=useState<ModerationIssue|null>(null);
   const [interactive, setInteractive] = useState(false);
   useEffect(() => setInteractive(true), []);
   const remaining = 10000 - body.length;
@@ -60,7 +62,7 @@ export function SocialPostComposer({ initialPost, networkEnabled = true, autoFoc
   }
 
   async function submit(event: React.FormEvent) {
-    event.preventDefault(); setNotice("");
+    event.preventDefault(); setNotice("");setModerationIssue(null);
     const invalidAlt = images.find((image) => !image.decorative && image.alt.trim().length < 2);
     if (invalidAlt) { setNotice("Describe each image or mark it decorative before publishing."); return; }
     if (!canSubmit || imageErrors.length) return;
@@ -76,7 +78,7 @@ export function SocialPostComposer({ initialPost, networkEnabled = true, autoFoc
           : { body: body.trim(), mediaIds, visibility, organizationId: null, idempotencyKey: crypto.randomUUID() }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error?.message ?? "Unable to save this post.");
+      if (!response.ok){setModerationIssue(moderationIssueFrom(result));throw new Error(result.error?.message ?? "Unable to save this post.");}
       setNotice(editing ? "Post updated." : "Post published.");
       if (!editing) { setBody(""); setExistingMedia([]); images.forEach((image) => URL.revokeObjectURL(image.preview)); setImages([]); }
       onSaved(result.data?.id ? result.data : undefined);
@@ -97,6 +99,7 @@ export function SocialPostComposer({ initialPost, networkEnabled = true, autoFoc
       <div className="composer-options"><label className="social-media-picker"><ImagePlus aria-hidden="true" /> Add images<input type="file" accept={mediaAccept} multiple disabled={mediaCount >= 4 || busy} onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = ""; }} /></label><Select aria-label="Post audience" value={visibility} onChange={(event) => setVisibility(event.target.value as typeof visibility)}><option value="campus_only">My campus</option><option value="friends">Friends</option>{networkEnabled && <option value="network">Campus Exchange network</option>}</Select></div>
       <div className="composer-actions">{onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}<Button type="submit" busy={busy} disabled={!canSubmit}>{busy ? <LoaderCircle aria-hidden="true" /> : <Send aria-hidden="true" />}{editing ? "Save changes" : "Publish"}</Button></div>
     </div>
-    {notice && <p className={notice.includes("Unable") || notice.includes("Describe") || notice.includes("Unsupported") ? "form-error" : "form-notice"} role="status">{notice}</p>}
+    {notice && <p className={notice.includes("Unable") || notice.includes("Describe") || notice.includes("Unsupported") || Boolean(moderationIssue) ? "form-error" : "form-notice"} role={moderationIssue?"alert":"status"}>{notice}</p>}
+    {moderationIssue&&<ModerationReviewButton issue={moderationIssue} onStatus={setNotice} onReviewed={() => setModerationIssue(null)}/>}
   </form>;
 }

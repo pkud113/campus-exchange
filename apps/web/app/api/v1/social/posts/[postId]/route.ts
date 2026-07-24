@@ -2,6 +2,7 @@ import { socialPostUpdateSchema } from "@campus-exchange/contracts";
 import { apiData, apiError, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
 import { hydrateSocialPosts, type SocialPostRow } from "@/lib/social";
 import { NextResponse } from "next/server";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 type Params = { params: Promise<{ postId: string }> };
 
@@ -20,6 +21,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const limited = await enforceRateLimit(request, "social-post-update", context.userId, 60, 3600); if (limited) return limited;
   const input = await parseJson(request, socialPostUpdateSchema); if (input instanceof NextResponse) return input;
   const { postId } = await params;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"social_post",operation:"edit",fields:{body:input.body},targetId:postId});if(moderation instanceof Response)return moderation;
   const { error } = await context.supabase.rpc("update_social_post", {
     target_post: postId,
     submitted_body: input.body,

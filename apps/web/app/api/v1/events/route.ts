@@ -1,6 +1,7 @@
 import { campusSelectorSchema, cursorSchema, eventInputSchema } from "@campus-exchange/contracts";
 import { apiData, apiError, decodeCursor, encodeCursor, enforceRateLimit, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
 import { NextResponse } from "next/server";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 export async function GET(request: Request) {
   const c=await requireVerified(request); if(c instanceof NextResponse)return c; const url=new URL(request.url);const parsed=cursorSchema.safeParse(Object.fromEntries(url.searchParams));if(!parsed.success)return apiError(request,400,"bad_request","Invalid pagination parameters.");const page=parsed.data; const cursor=decodeCursor(page.cursor);
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   const e=verifyMutationOrigin(request);if(e)return e;const c=await requireVerified(request);if(c instanceof NextResponse)return c;const limited=await enforceRateLimit(request,"event-create",c.userId,10,3600);if(limited)return limited;const input=await parseJson(request,eventInputSchema);if(input instanceof NextResponse)return input;
+  const moderation=await authorizeSharedTextMutation(request,c,{surface:"event",operation:"create",fields:{title:input.title,description:input.description,location:input.location},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   if(input.organizationId){const{data,error}=await c.supabase.rpc("create_organization_event",{target_organization:input.organizationId,submitted_title:input.title,submitted_description:input.description,submitted_location:input.location,submitted_starts_at:input.startsAt,submitted_ends_at:input.endsAt,submitted_capacity:input.capacity,submitted_visibility:input.visibility,request_key:input.idempotencyKey});return error?apiError(request,error.code==="42501"?403:400,error.code==="42501"?"forbidden":"bad_request","Unable to create this organization event."):apiData(request,{id:data},201);}
   const {data,error}=await c.supabase.from("events").insert({campus_id:c.campusId,organizer_id:c.userId,title:input.title,description:input.description,location:input.location,starts_at:input.startsAt,ends_at:input.endsAt,capacity:input.capacity,visibility:input.visibility,idempotency_key:input.idempotencyKey}).select().single();
   if(error?.code==="23505"){const old=await c.supabase.from("events").select().eq("organizer_id",c.userId).eq("idempotency_key",input.idempotencyKey).single();return apiData(request,old.data);} return error?apiError(request,500,"internal_error","Unable to create this event."):apiData(request,data,201);

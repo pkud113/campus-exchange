@@ -10,6 +10,7 @@ import {
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { listingImageTypes, maxImageBytes } from "@/lib/images";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 const schema = z
   .object({
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
   if (limited) return limited;
   const input = await parseJson(request, schema);
   if (input instanceof NextResponse) return input;
+  if(input.altText){const moderation=await authorizeSharedTextMutation(request,context,{surface:"media_alt_text",operation:"create",fields:{altText:input.altText}});if(moderation instanceof Response)return moderation;}
 
   const admin = createSupabaseAdminClient();
   let mediaCampusId = context.campusId;

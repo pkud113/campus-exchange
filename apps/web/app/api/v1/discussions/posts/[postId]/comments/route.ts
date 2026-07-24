@@ -2,6 +2,7 @@ import { discussionCommentInputSchema, type DiscussionComment } from "@campus-ex
 import { NextResponse } from "next/server";
 import { apiData, apiError, decodeCursor, discussionMutationError, encodeCursor, enforceRateLimit, parseJson, requireDiscussions, verifyMutationOrigin } from "@/lib/api";
 import { buildCommentTree } from "@/lib/discussions";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 type Params = { params: Promise<{ postId: string }> };
 type CommentRow = { id: string; post_id: string; author_id: string | null; parent_comment_id: string | null; depth: number; body: string | null; score: number; reply_count: number; removed_at: string | null; deleted_at: string | null; created_at: string };
 
@@ -61,6 +62,7 @@ export async function POST(request: Request, { params }: Params) {
   const input = await parseJson(request, discussionCommentInputSchema);
   if (input instanceof NextResponse) return input;
   const { postId } = await params;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"discussion_comment",operation:"create",fields:{body:input.body},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("create_discussion_comment", { target_post: postId, target_parent: input.parentCommentId, submitted_body: input.body, submitted_key: input.idempotencyKey });
   if (error) return discussionMutationError(request, error, "Unable to add this comment.");
   const created = (Array.isArray(data) ? data[0] : data) as CommentRow | null;

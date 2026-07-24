@@ -1,6 +1,7 @@
 import { contentDeletionSchema, discussionPostUpdateSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, apiError, discussionMutationError, parseJson, requireDiscussions, verifyMutationOrigin } from "@/lib/api";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 type Params = { params: Promise<{ postId: string }> };
 export async function GET(request: Request, { params }: Params) {
   const context = await requireDiscussions(request); if (context instanceof NextResponse) return context;
@@ -18,6 +19,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const context = await requireDiscussions(request); if (context instanceof NextResponse) return context;
   const input = await parseJson(request, discussionPostUpdateSchema); if (input instanceof NextResponse) return input;
   const { postId } = await params;
+  const{data:current}=await context.supabase.from("discussion_posts").select("title,body").eq("id",postId).single();const fields={...(current?.title===input.title?{}:{title:input.title}),...(current?.body===input.body?{}:{body:input.body})};if(Object.keys(fields).length){const moderation=await authorizeSharedTextMutation(request,context,{surface:"discussion_post",operation:"edit",fields,targetId:postId});if(moderation instanceof Response)return moderation;}
   const { data, error } = await context.supabase.rpc("update_discussion_post", { target_post: postId, submitted_title: input.title, submitted_body: input.body, submitted_link: input.linkUrl, submitted_media: input.mediaId });
   return error ? discussionMutationError(request, error, "Unable to update this post.") : apiData(request, data);
 }

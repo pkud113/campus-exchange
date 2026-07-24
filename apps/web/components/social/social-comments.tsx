@@ -7,6 +7,7 @@ import { Button, EmptyState, TextArea } from "@/components/ui";
 import { ConfirmationDialog } from "@/components/ui-interactive";
 import { UserAvatar } from "@/components/user-avatar";
 import { SocialReportAction } from "./social-report-action";
+import { ModerationReviewButton, moderationIssueFrom, type ModerationIssue } from "../moderation-review-button";
 
 export type SocialCommentView = { id: string; post_id: string; author_profile_id: string | null; parent_comment_id: string | null; body: string | null; edited_at: string | null; removed_at: string | null; deleted_at: string | null; created_at: string; canManage: boolean; author: Record<string, unknown> | null };
 
@@ -22,6 +23,7 @@ export function SocialComments({ postId, initialComments }: { postId: string; in
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [moderationIssue,setModerationIssue]=useState<ModerationIssue|null>(null);
   const roots = comments.filter((comment) => !comment.parent_comment_id);
 
   async function reload() {
@@ -32,20 +34,20 @@ export function SocialComments({ postId, initialComments }: { postId: string; in
 
   async function publish(body: string, parentCommentId: string | null) {
     if (!body.trim()) return;
-    setBusy(true); setStatus("");
+    setBusy(true); setStatus("");setModerationIssue(null);
     const response = await fetch(`/api/v1/social/posts/${postId}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: body.trim(), parentCommentId, idempotencyKey: crypto.randomUUID() }) });
     const result = await response.json(); setBusy(false);
-    if (!response.ok) { setStatus(result.error?.message ?? "Unable to add this comment."); return; }
+    if (!response.ok) { setModerationIssue(moderationIssueFrom(result));setStatus(result.error?.message ?? "Unable to add this comment."); return; }
     if (parentCommentId) { setReplyTo(null); setReplyDraft(""); } else setDraft("");
     await reload();
   }
 
   async function saveEdit(commentId: string) {
     if (!editDraft.trim()) return;
-    setBusy(true); setStatus("");
+    setBusy(true); setStatus("");setModerationIssue(null);
     const response = await fetch(`/api/v1/social/posts/${postId}/comments/${commentId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: editDraft.trim() }) });
     const result = await response.json(); setBusy(false);
-    if (!response.ok) { setStatus(result.error?.message ?? "Unable to update this comment."); return; }
+    if (!response.ok) { setModerationIssue(moderationIssueFrom(result));setStatus(result.error?.message ?? "Unable to update this comment."); return; }
     setEditing(null); setEditDraft(""); await reload();
   }
 
@@ -77,6 +79,7 @@ export function SocialComments({ postId, initialComments }: { postId: string; in
     <header><div><span className="overline">CONVERSATION</span><h2 id="comments-title">Comments</h2></div><span>{comments.filter((comment) => !comment.deleted_at && !comment.removed_at).length}</span></header>
     <form className="social-root-comment" onSubmit={(event) => { event.preventDefault(); void publish(draft, null); }}><label htmlFor="root-comment">Join the conversation</label><TextArea id="root-comment" rows={4} maxLength={4000} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add something useful…" /><Button type="submit" busy={busy} disabled={!draft.trim()}><Send /> Comment</Button></form>
     {status && <p className="form-error" role="status">{status}</p>}
+    {moderationIssue&&<ModerationReviewButton issue={moderationIssue} onStatus={setStatus} onReviewed={() => setModerationIssue(null)}/>}
     <div className="social-comment-list">{roots.length ? roots.map((comment) => renderComment(comment)) : <EmptyState icon={<MessageCircle />} title="No comments yet" description="Start a thoughtful conversation about this post." compact />}</div>
     <ConfirmationDialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} onConfirm={remove} title="Delete this comment?" description="It will become a tombstone immediately and be scheduled for permanent purge after 30 days." confirmLabel="Delete comment" destructive busy={busy} />
   </section>;

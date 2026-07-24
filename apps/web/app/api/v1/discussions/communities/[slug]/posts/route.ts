@@ -2,6 +2,7 @@ import { discussionFeedQuerySchema, discussionPostInputSchema, type DiscussionSo
 import { NextResponse } from "next/server";
 import { apiData, apiError, discussionMutationError, enforceRateLimit, parseJson, requireDiscussions, verifyMutationOrigin } from "@/lib/api";
 import { decodeDiscussionCursor, discussionCursorFor } from "@/lib/discussions";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 type Params = { params: Promise<{ slug: string }> };
 
 export async function GET(request: Request, { params }: Params) {
@@ -39,6 +40,7 @@ export async function POST(request: Request, { params }: Params) {
   const limited = await enforceRateLimit(request, "discussion-post", context.userId, 20, 3600); if (limited) return limited;
   const input = await parseJson(request, discussionPostInputSchema); if (input instanceof NextResponse) return input;
   const { slug } = await params;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"discussion_post",operation:"create",fields:{title:input.title,body:input.body},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("create_discussion_post", { target_slug: slug, submitted_type: input.postType, submitted_title: input.title, submitted_body: input.body, submitted_link: input.linkUrl, submitted_media: input.mediaId, submitted_key: input.idempotencyKey });
   return error ? discussionMutationError(request, error, "Unable to create this post.") : apiData(request, data, 201);
 }

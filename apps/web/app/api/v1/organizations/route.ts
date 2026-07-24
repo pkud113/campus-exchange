@@ -1,6 +1,7 @@
 import { organizationInputSchema } from "@campus-exchange/contracts";
 import { apiData, apiError, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
 import { NextResponse } from "next/server";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 
 export async function GET(request: Request) {
   const context = await requireVerified(request); if (context instanceof NextResponse) return context;
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
   const context = await requireVerified(request); if (context instanceof NextResponse) return context;
   const limited = await enforceRateLimit(request, "organization-create", context.userId, 5, 86400); if (limited) return limited;
   const input = await parseJson(request, organizationInputSchema); if (input instanceof NextResponse) return input;
+  const moderation=await authorizeSharedTextMutation(request,context,{surface:"organization",operation:"create",fields:{slug:input.slug,name:input.name,description:input.description},idempotencyKey:input.idempotencyKey});if(moderation instanceof Response)return moderation;
   const { data, error } = await context.supabase.rpc("create_organization", { submitted_slug: input.slug, submitted_name: input.name, submitted_description: input.description, submitted_visibility: input.visibility, submitted_policy: input.membershipPolicy, submitted_website: input.websiteUrl, request_key: input.idempotencyKey });
   if (error) return mutationError(request, error, "Unable to create this organization.");
   return apiData(request, { id: data, slug: input.slug }, 201);

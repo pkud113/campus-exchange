@@ -1,6 +1,7 @@
 import { contentDeletionSchema, discussionCommunityUpdateSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, apiError, discussionMutationError, parseJson, requireDiscussions, verifyMutationOrigin } from "@/lib/api";
+import { authorizeSharedTextMutation } from "@/lib/content-moderation";
 type Params = { params: Promise<{ slug: string }> };
 
 export async function GET(request: Request, { params }: Params) {
@@ -20,6 +21,8 @@ export async function PATCH(request: Request, { params }: Params) {
   const context = await requireDiscussions(request); if (context instanceof NextResponse) return context;
   const input = await parseJson(request, discussionCommunityUpdateSchema); if (input instanceof NextResponse) return input;
   const { slug } = await params;
+  const {data:targetCommunity}=await context.supabase.from("discussion_communities").select("id,display_name,description,rules").eq("slug",slug.toLowerCase()).single();
+  const fields={...(targetCommunity?.display_name===input.displayName?{}:{displayName:input.displayName}),...(targetCommunity?.description===input.description?{}:{description:input.description}),...(targetCommunity?.rules===input.rules?{}:{rules:input.rules})};if(Object.keys(fields).length){const moderation=await authorizeSharedTextMutation(request,context,{surface:"discussion_community",operation:"edit",fields,targetId:targetCommunity?.id});if(moderation instanceof Response)return moderation;}
   const { data, error } = await context.supabase.rpc("update_discussion_community", { target_slug: slug, submitted_name: input.displayName, submitted_description: input.description, submitted_rules: input.rules, submitted_permission: input.postingPermission, submitted_comments_enabled: input.commentsEnabled });
   return error ? discussionMutationError(request, error, "Unable to update this community.") : apiData(request, data);
 }

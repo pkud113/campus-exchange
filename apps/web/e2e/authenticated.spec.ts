@@ -46,6 +46,25 @@ test("all twelve authenticated personas establish a verified application session
   }
 });
 
+test("private message requests never invoke shared-text moderation", async ({ browser }, testInfo) => {
+  const context = await personaContext(browser, "studentA");
+  const target = testInfo.project.name === "desktop-chromium" ? "studentB" : "organizationMember";
+  const profileResponse = await context.request.get(`/api/v1/profiles/${personas[target].handle}`);
+  const profile = await profileResponse.json();
+  expect(profileResponse.ok(), JSON.stringify(profile)).toBe(true);
+  const response = await context.request.post("/api/v1/conversation-requests", {
+    headers: { origin: "http://127.0.0.1:3100", "content-type": "application/json" },
+    data: {
+      profileId: profile.data.id,
+      openingMessage: `CE test unavailable private request ${testInfo.project.name}`,
+      idempotencyKey: crypto.randomUUID(),
+    },
+  });
+  const result = await response.json();
+  expect(response.ok(), JSON.stringify(result)).toBe(true);
+  await context.close();
+});
+
 test("profiles, gallery, organization tab, friendship state, and people search are responsive", async ({ browser }) => {
   const { context, page } = await pageFor(browser, "studentA");
   await page.goto(`/u/${personas.studentA.handle}`);
@@ -80,7 +99,7 @@ test("profile is the canonical posting hub with responsive URL-addressable tabs"
     const metrics = await page.locator(".profile-tab-scroller").evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
     expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
   }
-  await tabs.filter({ hasText: "About" }).click();
+  await page.getByRole("tab", { name: "Posts", exact: true }).press("End");
   await expect(page).toHaveURL(/tab=about/);
   await expect(page.getByRole("heading", { name: "About", level: 2 })).toBeVisible();
   await expectResponsiveSurface(page);
@@ -103,6 +122,23 @@ test("personal posts are created on profile and discovered through Social", asyn
   await page.getByRole("tab", { name: "Campus" }).click();
   await expect(page).toHaveURL(/scope=campus/);
   await expect(page.getByText(body)).toBeVisible();
+  await context.close();
+});
+
+test("shared-text moderation preserves drafts and connects contextual review", async ({ browser }, testInfo) => {
+  const { context, page } = await pageFor(browser, "studentA");
+  const draft = `CE test review ${testInfo.project.name} ${Date.now()}`;
+  await page.goto(`/u/${personas.studentA.handle}?tab=posts&compose=1`);
+  await expect(page.locator(".social-composer-form")).toHaveAttribute("data-interactive", "true", { timeout: 15_000 });
+  await page.getByLabel("Post text").fill(draft);
+  await page.getByRole("button", { name: "Publish" }).click();
+  await expect(page.locator(".social-composer-form .form-error[role='alert']")).toContainText("needs a safety review");
+  await expect(page.getByLabel("Post text")).toHaveValue(draft);
+  await expect(page.locator(".social-post-card").filter({ hasText: draft })).toHaveCount(0);
+  await page.getByRole("button", { name: "Request staff review" }).click();
+  await expect(page.getByRole("status")).toContainText("Staff review requested");
+  await page.screenshot({ path: testInfo.outputPath(`moderation-review-${testInfo.project.name}.png`), fullPage: true });
+  await expectResponsiveSurface(page);
   await context.close();
 });
 

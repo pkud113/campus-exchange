@@ -8,7 +8,7 @@ export async function GET(request: Request, { params }: Params) {
   const { data: selected, error } = await context.supabase.from("moderation_cases").select("*").eq("id", id).single();
   if (error || !selected) return apiError(request, 404, "not_found", "Moderation case not found.");
   const [{ data: report }, { data: events }, { data: actions }, { data: appeals }] = await Promise.all([
-    context.supabase.from("reports").select("id,reporter_id,target_type,target_id,reason,details,message_snapshot,content_snapshot,status,created_at,resolved_at").eq("id", selected.report_id).single(),
+    context.supabase.from("reports").select("id,reporter_id,target_type,target_id,reason,details,message_snapshot,content_snapshot,status,source,created_at,resolved_at").eq("id", selected.report_id).single(),
     context.supabase.from("moderation_case_events").select("id,actor_id,event_type,note,internal,metadata,created_at").eq("case_id", id).order("created_at"),
     context.supabase.from("moderation_actions").select("id,moderator_id,action,reason,reversible,reversed_at,metadata,created_at").eq("case_id", id).order("created_at"),
     context.supabase.from("moderation_appeals").select("id,appellant_id,statement,status,assigned_to,resolution,created_at,resolved_at").eq("case_id", id).order("created_at"),

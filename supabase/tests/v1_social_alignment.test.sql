@@ -1,6 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(86);
+select set_config('ce.moderation_test_bypass','on',false);
 
 insert into public.campuses(id,name,short_name,slug,timezone,status) values
  ('f0000000-0000-4000-8000-000000000001','Fixture Campus','Fixture','fixture-campus','America/Chicago','enabled'),
