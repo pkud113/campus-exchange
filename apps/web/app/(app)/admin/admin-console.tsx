@@ -3,225 +3,69 @@
 import type { StaffCapability } from "@campus-exchange/shared-types";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Building2, FileClock, Gauge, Search, Settings, ShieldCheck, UsersRound } from "lucide-react";
-import { EmptyState, SurfaceCard } from "@/components/ui";
-import { AdminQueue } from "./admin-queue";
+import { AlertTriangle, Building2, ExternalLink, FileClock, Gauge, Loader2, Search, Settings, ShieldCheck, UsersRound } from "lucide-react";
+import { EmptyState } from "@/components/ui";
+import { staffRoleLabel } from "@/lib/admin-presentation";
+import { AdminQueue, type AdminCaseFilters } from "./admin-queue";
 
 type Section = "overview" | "institutions" | "users" | "staff" | "cases" | "content" | "audit" | "settings";
 type Case = Parameters<typeof AdminQueue>[0]["initialCases"][number];
-type StaffContext = {
-  campusId: string;
-  scope: "platform" | "campus";
-  platformRole: string | null;
-  campusRole: string | null;
-  capabilities: StaffCapability[];
-};
+type StaffContext = { campusId: string; campusName: string; institutionId: string | null; scope: "platform" | "campus"; platformRole: string | null; campusRole: string | null; capabilities: StaffCapability[] };
 type Institution = { institution_id: string; name: string; city: string; region: string; status: string; registration_status: string; campus_id: string | null; campus_status: string | null; member_count: number; verification_count: number };
 type UserRow = { id: string; handle: string; display_name: string | null; status: string; account_kind: string; verified_until: string | null; restricted_until: string | null; campus_id: string; campuses: { name: string; short_name: string; institution_id: string } | Array<{ name: string; short_name: string; institution_id: string }> };
 type Operator = { profile_id: string; handle: string; display_name: string | null; campus_id: string; campus_name: string; campus_short_name: string; campus_role: string | null; platform_role: string | null };
 type AuditRow = { id: number; campus_id: string | null; actor_id: string | null; action: string; target_type: string; target_id: string; metadata: Record<string, unknown>; created_at: string };
 type OperationalSetting = { key: string; label: string; description: string; value_type: "boolean" | "integer" | "text"; minimum_integer: number | null; maximum_integer: number | null; value: unknown };
+type DashboardSummary = { openCases: number; urgentCases: number; pendingAppeals: number; automatedReviews: number; restrictedUsers: number; restrictedContent: number; pendingStaffInvitations: number; recentAuditedActions: number };
+type ContentRow = { id: string; surface: string; target_type: string; title: string; excerpt: string; status: string; campus_id: string; campus_name: string; campus_short_name: string; institution_id: string | null; source_href: string; moderation_case_id: string | null; moderation_case_status: string | null; operational_case_id: string | null; operational_case_status: string | null; created_at: string };
 
 const sections: Array<{ id: Section; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "institutions", label: "Institutions" },
-  { id: "users", label: "Users" },
-  { id: "staff", label: "Staff" },
-  { id: "cases", label: "Cases & appeals" },
-  { id: "content", label: "Content" },
-  { id: "audit", label: "Audit" },
-  { id: "settings", label: "Settings" }
+  { id: "overview", label: "Overview" }, { id: "institutions", label: "Institutions" }, { id: "users", label: "Users" },
+  { id: "staff", label: "Staff" }, { id: "cases", label: "Cases & appeals" }, { id: "content", label: "Content" },
+  { id: "audit", label: "Audit" }, { id: "settings", label: "Settings" }
 ];
 
-async function readData<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  const json = await response.json();
-  if (!response.ok) throw new Error(json.error?.message ?? "Administrative request failed.");
-  return json.data as T;
-}
+async function readData<T>(url: string, init?: RequestInit): Promise<T> { const response = await fetch(url, init); const json = await response.json(); if (!response.ok) throw new Error(json.error?.message ?? "Administrative request failed."); return json.data as T; }
+async function requestData(url: string, body: Record<string, unknown>) { return readData(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); }
 
-export function AdminConsole({
-  context,
-  initialCases,
-  initialSection,
-  initialSelectedId
-}: {
-  context: StaffContext;
-  initialCases: Case[];
-  initialSection: Section;
-  initialSelectedId?: string;
-}) {
-  const [institutions, setInstitutions] = useState<Institution[]>([]);
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [operators, setOperators] = useState<Operator[]>([]);
-  const [audit, setAudit] = useState<AuditRow[]>([]);
-  const [settingsRows, setSettingsRows] = useState<OperationalSetting[]>([]);
-  const [query, setQuery] = useState("");
-  const [reason, setReason] = useState("");
-  const [notice, setNotice] = useState("");
-
+export function AdminConsole({ context, initialCases, initialSection, initialSelectedId, caseFilters, contentFilters }: { context: StaffContext; initialCases: Case[]; initialSection: Section; initialSelectedId?: string; caseFilters?: AdminCaseFilters; contentFilters?: { q?: string; surface?: string; status?: string; institution?: string } }) {
+  const [institutions, setInstitutions] = useState<Institution[]>([]); const [users, setUsers] = useState<UserRow[]>([]); const [operators, setOperators] = useState<Operator[]>([]); const [audit, setAudit] = useState<AuditRow[]>([]); const [settingsRows, setSettingsRows] = useState<OperationalSetting[]>([]);
+  const [query, setQuery] = useState(""); const [reason, setReason] = useState(""); const [notice, setNotice] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
   const can = useCallback((capability: StaffCapability) => context.capabilities.includes(capability), [context.capabilities]);
-  const load = useCallback(async () => {
-    try {
-      if (initialSection === "institutions" && can("institutions.read")) setInstitutions(await readData(`/api/v1/admin/institutions?q=${encodeURIComponent(query)}`));
-      if (initialSection === "users" && can("users.read")) setUsers(await readData(`/api/v1/admin/users?q=${encodeURIComponent(query)}`));
-      if (initialSection === "staff" && can("cases.read")) setOperators(await readData(`/api/v1/admin/operators?q=${encodeURIComponent(query)}`));
-      if (initialSection === "audit" && can("audit.read")) setAudit(await readData("/api/v1/admin/audit"));
-      if (initialSection === "settings" && can("settings.manage")) setSettingsRows(await readData("/api/v1/admin/settings"));
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to load this section.");
-    }
-  }, [can, initialSection, query]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => void load(), 200);
-    return () => clearTimeout(timer);
-  }, [load]);
-
-  async function applyAction(action: string, targetType: string, targetId: string) {
-    if (reason.trim().length < 10) {
-      setNotice("Enter an operational reason of at least 10 characters.");
-      return;
-    }
-    try {
-      await readData("/api/v1/admin/actions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, targetType, targetId, reason, idempotencyKey: crypto.randomUUID() })
-      });
-      setNotice("Action applied through an audited operational case.");
-      setReason("");
-      await load();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to apply the action.");
-    }
-  }
-
-  async function inviteModerator(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    try {
-      await requestData("/api/v1/admin/staff/invite", {
-        email: form.get("email"),
-        campusId: form.get("campusId"),
-        reason: form.get("reason"),
-        idempotencyKey: crypto.randomUUID()
-      });
-      setNotice("Moderator invitation created and audited.");
-      event.currentTarget.reset();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to invite this moderator.");
-    }
-  }
-
-  async function revokeModerator(profileId: string) {
-    if (reason.trim().length < 10) {
-      setNotice("Enter a revocation reason of at least 10 characters.");
-      return;
-    }
-    try {
-      await requestData(`/api/v1/admin/staff/${profileId}/revoke`, { reason, idempotencyKey: crypto.randomUUID() });
-      setNotice("Moderator role revoked and audited.");
-      setReason("");
-      await load();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to revoke this moderator.");
-    }
-  }
-
+  const load = useCallback(async () => { setLoading(true); setError(""); try {
+    if (initialSection === "institutions" && can("institutions.read")) setInstitutions(await readData(`/api/v1/admin/institutions?q=${encodeURIComponent(query)}`));
+    if (initialSection === "users" && can("users.read")) setUsers(await readData(`/api/v1/admin/users?q=${encodeURIComponent(query)}`));
+    if (initialSection === "staff" && can("cases.read")) { const [staffRows, institutionRows] = await Promise.all([readData<Operator[]>(`/api/v1/admin/operators?q=${encodeURIComponent(query)}`), context.scope === "platform" ? readData<Institution[]>("/api/v1/admin/institutions?lifecycle=active&limit=50") : Promise.resolve([])]); setOperators(staffRows); if (institutionRows.length) setInstitutions(institutionRows); }
+    if (initialSection === "audit" && can("audit.read")) setAudit(await readData("/api/v1/admin/audit"));
+    if (initialSection === "settings" && can("settings.manage")) setSettingsRows(await readData("/api/v1/admin/settings"));
+  } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to load this section."); } finally { setLoading(false); } }, [can, context.scope, initialSection, query]);
+  useEffect(() => { const timer=setTimeout(() => void load(),200); return () => clearTimeout(timer); }, [load]);
+  async function applyAction(action: string,targetType: string,targetId: string) { if(reason.trim().length<10){setNotice("Enter an operational reason of at least 10 characters.");return;} try { await requestData("/api/v1/admin/actions",{action,targetType,targetId,reason,idempotencyKey:crypto.randomUUID()}); setNotice("Action applied through an audited operational case.");setReason("");await load(); } catch(caught){setNotice(caught instanceof Error?caught.message:"Unable to apply the action.");} }
+  async function inviteModerator(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form=new FormData(event.currentTarget); try { await requestData("/api/v1/admin/staff/invite",{email:form.get("email"),campusId:form.get("campusId"),reason:form.get("reason"),idempotencyKey:crypto.randomUUID()});setNotice("Moderator invitation created and audited.");event.currentTarget.reset(); } catch(caught){setNotice(caught instanceof Error?caught.message:"Unable to invite this moderator.");} }
+  async function revokeModerator(profileId:string){if(reason.trim().length<10){setNotice("Enter a revocation reason of at least 10 characters.");return;}try{await requestData(`/api/v1/admin/staff/${profileId}/revoke`,{reason,idempotencyKey:crypto.randomUUID()});setNotice("Moderator role revoked and audited.");setReason("");await load();}catch(caught){setNotice(caught instanceof Error?caught.message:"Unable to revoke this moderator.");}}
+  const role = staffRoleLabel(context); const scopeLabel=context.scope==="campus"?context.campusName:"All institutions";
   return <main className="dashboard feature-page admin-console">
-    <header className="moderation-center-header">
-      <div><span className="overline">OPERATIONS</span><h1>Administration console</h1><p>Scoped platform operations, safety review, restoration, and immutable audit history.</p></div>
-      <span className="staff-pill"><ShieldCheck /> {context.scope} scope · AAL2 protected</span>
-    </header>
-    <nav className="settings-tabs" aria-label="Administration sections">
-      {sections.filter((section) => section.id !== "settings" || can("settings.manage")).map((section) =>
-        <Link key={section.id} className={initialSection === section.id ? "active" : ""} href={`/admin?section=${section.id}`}>{section.label}</Link>
-      )}
-    </nav>
-    {notice && <p className="form-notice" role="status">{notice}</p>}
-
-    {initialSection === "overview" && <section className="settings-grid">
-      <SurfaceCard><Gauge /><h2>Role and scope</h2><p>{context.platformRole ?? context.campusRole} · {context.scope}</p><small>{context.capabilities.length} capabilities resolved server-side.</small></SurfaceCard>
-      <SurfaceCard><ShieldCheck /><h2>Privileged access</h2><p>Every list, detail, and action rechecks AAL2 and staff scope in the database.</p></SurfaceCard>
-      <SurfaceCard><FileClock /><h2>Operational cases</h2><p>Administrative mutations require a reason, idempotency key, and protected before-state.</p></SurfaceCard>
-    </section>}
-
-    {["institutions", "users", "staff"].includes(initialSection) && <div className="moderation-toolbar">
-      <label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${initialSection}`} /></label>
-    </div>}
-
-    {initialSection === "institutions" && <section className="managed-list">
-      {!institutions.length && <EmptyState icon={<Building2 />} title="No institutions in scope" description="Try another directory search." />}
-      {institutions.map((institution) => <article key={institution.institution_id}>
-        <div><h3>{institution.name}</h3><p>{institution.city}, {institution.region} · UNITID {institution.institution_id}</p><small>{institution.registration_status} · campus {institution.campus_status ?? "not provisioned"} · {institution.member_count} members · {institution.verification_count} verifications</small></div>
-        {can("institutions.manage") && <div className="moderation-actions">
-          <button className="button button-ghost button-small" onClick={() => void applyAction(institution.registration_status === "open" ? "suspend_registration" : "open_registration", "institution", institution.institution_id)}>{institution.registration_status === "open" ? "Suspend registration" : "Open registration"}</button>
-          {institution.campus_id && <button className="button button-ghost button-small" onClick={() => void applyAction(institution.campus_status === "enabled" ? "suspend_campus" : "enable_campus", "institution", institution.institution_id)}>{institution.campus_status === "enabled" ? "Suspend campus" : "Enable campus"}</button>}
-        </div>}
-      </article>)}
-      {can("institutions.manage") && <label>Required operational reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={2000} /></label>}
-    </section>}
-
-    {initialSection === "users" && <section className="managed-list">
-      {!users.length && <EmptyState icon={<UsersRound />} title="No users in scope" description="Search by handle or display name." />}
-      {users.map((user) => {
-        const campus = Array.isArray(user.campuses) ? user.campuses[0] : user.campuses;
-        return <article key={user.id}><div><h3>{user.display_name ?? `@${user.handle}`}</h3><p>@{user.handle} · {campus?.short_name} · {user.account_kind}</p><small>{user.status} · verification {user.verified_until ? new Date(user.verified_until).toLocaleDateString() : "not applicable"}</small></div>
-          {can("users.restrict") && <div className="moderation-actions"><button className="button button-ghost button-small" onClick={() => void applyAction("restrict", "profile", user.id)}>Restrict 7 days</button><button className="button button-danger button-small" onClick={() => void applyAction(user.status === "active" ? "suspend" : "restore", "profile", user.id)}>{user.status === "active" ? "Suspend" : "Restore"}</button></div>}
-        </article>;
-      })}
-      {can("users.restrict") && <label>Required operational reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={2000} /></label>}
-    </section>}
-
-    {initialSection === "staff" && <section className="admin-content">
-      {can("campus_moderators.manage") && <SurfaceCard><form className="form-grid" onSubmit={inviteModerator}><h2 className="full">Invite a campus moderator</h2><label>Email<input name="email" type="email" required /></label><label>Campus ID<input name="campusId" type="text" defaultValue={context.campusId} required /></label><label className="full">Reason<textarea name="reason" minLength={10} maxLength={2000} required /></label><button className="button button-primary">Create invitation</button></form></SurfaceCard>}
-      <div className="managed-list">{operators.map((operator) => <article key={operator.profile_id}><div><h3>{operator.display_name ?? `@${operator.handle}`}</h3><p>@{operator.handle} · {operator.campus_short_name}</p><small>{operator.platform_role ?? operator.campus_role}</small></div>{operator.campus_role === "moderator" && can("campus_moderators.manage") && <button className="button button-danger button-small" onClick={() => void revokeModerator(operator.profile_id)}>Revoke moderator</button>}</article>)}</div>
-      {can("campus_moderators.manage") && <label>Required revocation reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={2000} /></label>}
-    </section>}
-
-    {initialSection === "cases" && <AdminQueue initialCases={initialCases} scope={context.scope === "platform" ? "Platform" : "Campus"} {...(initialSelectedId ? { initialSelectedId } : {})} />}
-
-    {initialSection === "content" && <section className="settings-grid">
-      {[
-        ["Social", "Posts and network activity"],
-        ["Discussions", "Campus-private communities and threads"],
-        ["Organizations", "Channels, roles, memberships, and messages"],
-        ["Marketplace", "Listings and exchange safety"],
-        ["Events", "Campus and network events"]
-      ].map(([title, description]) => <SurfaceCard key={title}><h2>{title}</h2><p>{description}</p><small>Actions open an audited case and use soft restriction/removal with restoration.</small></SurfaceCard>)}
-    </section>}
-
-    {initialSection === "audit" && <section className="managed-list">
-      {audit.map((row) => <article key={row.id}><div><h3>{row.action}</h3><p>{row.target_type} · {row.target_id}</p><small>{new Date(row.created_at).toLocaleString()} · actor {row.actor_id?.slice(0, 8) ?? "system"}</small></div></article>)}
-    </section>}
-
-    {initialSection === "settings" && <section className="managed-list">
-      {settingsRows.map((setting) => <SettingRow key={setting.key} setting={setting} onSaved={() => void load()} onNotice={setNotice} />)}
-    </section>}
+    <header className="moderation-center-header"><div><span className="overline">OPERATIONS</span><h1>Administration console</h1><p>Scoped safety operations, restoration, and immutable audit history.</p></div><span className="staff-pill"><ShieldCheck aria-hidden="true" /> {role} · {scopeLabel} · AAL2</span></header>
+    <nav className="admin-tabs" aria-label="Administration sections">{sections.filter((item)=>item.id!=="settings"||can("settings.manage")).map((item)=><Link key={item.id} aria-current={initialSection===item.id?"page":undefined} className={initialSection===item.id?"active":undefined} href={`/admin?section=${item.id}`}>{item.label}</Link>)}</nav>
+    {notice&&<p className="form-notice" role="status">{notice}</p>}{error&&<p className="form-error" role="alert">{error}</p>}{loading&&<p className="admin-loading" role="status"><Loader2 className="spin"/>Loading scoped records…</p>}
+    {initialSection==="overview"&&<AdminOverview />}
+    {["institutions","users","staff"].includes(initialSection)&&<div className="moderation-toolbar"><label><Search aria-hidden="true"/><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder={`Search ${initialSection}`} /></label></div>}
+    {initialSection==="institutions"&&<section className="managed-list" aria-label="Institutions">{!loading&&!error&&!institutions.length&&<EmptyState icon={<Building2/>} title="No institutions in scope" description="Try another directory search."/>}{institutions.map((institution)=><article key={institution.institution_id}><div><h3>{institution.name}</h3><p>{institution.city}, {institution.region} · UNITID {institution.institution_id}</p><small>{institution.registration_status} · campus {institution.campus_status??"not provisioned"} · {institution.member_count} members · {institution.verification_count} verifications</small></div>{can("institutions.manage")&&<div className="moderation-actions"><button className="button button-ghost button-small" onClick={()=>void applyAction(institution.registration_status==="open"?"suspend_registration":"open_registration","institution",institution.institution_id)}>{institution.registration_status==="open"?"Suspend registration":"Open registration"}</button>{institution.campus_id&&<button className="button button-ghost button-small" onClick={()=>void applyAction(institution.campus_status==="enabled"?"suspend_campus":"enable_campus","institution",institution.institution_id)}>{institution.campus_status==="enabled"?"Suspend campus":"Enable campus"}</button>}</div>}</article>)}{can("institutions.manage")&&<ReasonField value={reason} onChange={setReason}/>}</section>}
+    {initialSection==="users"&&<section className="managed-list" aria-label="Users">{!loading&&!error&&!users.length&&<EmptyState icon={<UsersRound/>} title="No users in scope" description="Search by handle or display name."/>}{users.map((user)=>{const campus=Array.isArray(user.campuses)?user.campuses[0]:user.campuses;return <article key={user.id}><div><h3>{user.display_name??`@${user.handle}`}</h3><p>@{user.handle} · {campus?.short_name} · {user.account_kind}</p><small>{user.status} · verification {user.verified_until?new Date(user.verified_until).toLocaleDateString():"not applicable"}</small></div>{can("users.restrict")&&<div className="moderation-actions"><button className="button button-ghost button-small" onClick={()=>void applyAction("restrict","profile",user.id)}>Restrict 7 days</button><button className="button button-danger button-small" onClick={()=>void applyAction(user.status==="active"?"suspend":"restore","profile",user.id)}>{user.status==="active"?"Suspend":"Restore"}</button></div>}</article>;})}{can("users.restrict")&&<ReasonField value={reason} onChange={setReason}/>}</section>}
+    {initialSection==="staff"&&<section className="admin-content">{can("campus_moderators.manage")&&<form className="admin-form-card form-grid" onSubmit={inviteModerator}><h2 className="full">Invite a campus moderator</h2><label>Email<input name="email" type="email" required /></label>{context.scope==="campus"?<input name="campusId" type="hidden" value={context.campusId}/>:<label>Institution<select name="campusId" required defaultValue=""><option value="" disabled>Select a provisioned institution</option>{institutions.filter((item)=>item.campus_id).map((item)=><option key={item.institution_id} value={item.campus_id!}>{item.name}</option>)}</select></label>}<label className="full">Reason<textarea name="reason" minLength={10} maxLength={2000} required /></label><button className="button button-primary">Create invitation</button></form>}{!loading&&!operators.length&&<EmptyState icon={<ShieldCheck/>} title="No staff records in scope" description="Scoped moderators and administrators will appear here."/>}<div className="managed-list">{operators.map((operator)=><article key={operator.profile_id}><div><h3>{operator.display_name??`@${operator.handle}`}</h3><p>@{operator.handle} · {operator.campus_short_name}</p><small>{operator.platform_role?`Platform ${operator.platform_role}`:`Campus ${operator.campus_role}`}</small></div>{operator.campus_role==="moderator"&&can("campus_moderators.manage")&&<button className="button button-danger button-small" onClick={()=>void revokeModerator(operator.profile_id)}>Revoke moderator</button>}</article>)}</div>{can("campus_moderators.manage")&&<ReasonField value={reason} onChange={setReason}/>} {can("staff.manage")&&<p className="admin-trust-note"><ShieldCheck/> Campus-administrator and platform-role grants continue through the trusted operator workflow.</p>}</section>}
+    {initialSection==="cases"&&<AdminQueue initialCases={initialCases} scope={scopeLabel} {...(initialSelectedId?{initialSelectedId}:{})} {...(caseFilters ? { initialFilters: caseFilters } : {})}/>}
+    {initialSection==="content"&&<AdminContentBrowser context={context} {...(contentFilters ? { initialFilters: contentFilters } : {})}/>}
+    {initialSection==="audit"&&<section className="managed-list" aria-label="Audit history">{!loading&&!error&&!audit.length&&<EmptyState icon={<FileClock/>} title="No audited actions in scope" description="Audited operational actions will appear here."/>}{audit.map((row)=><article key={row.id}><div><h3>{row.action.replaceAll("_"," ")}</h3><p>{row.target_type} · {row.target_id}</p><small>{new Date(row.created_at).toLocaleString()} · actor {row.actor_id?.slice(0,8)??"system"}</small></div></article>)}</section>}
+    {initialSection==="settings"&&<section className="managed-list">{!loading&&!error&&!settingsRows.length&&<EmptyState icon={<Settings/>} title="No operational settings available"/>}{settingsRows.map((setting)=><SettingRow key={setting.key} setting={setting} onSaved={()=>void load()} onNotice={setNotice}/>)}</section>}
   </main>;
 }
 
-async function requestData(url: string, body: Record<string, unknown>) {
-  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const json = await response.json();
-  if (!response.ok) throw new Error(json.error?.message ?? "Administrative request failed.");
-  return json.data;
-}
+function AdminOverview(){const [data,setData]=useState<DashboardSummary|null>(null);const [error,setError]=useState("");useEffect(()=>{void readData<DashboardSummary>("/api/v1/admin/dashboard").then(setData).catch((caught)=>setError(caught instanceof Error?caught.message:"Unable to load overview."));},[]);if(error)return <div className="admin-state error" role="alert"><AlertTriangle/><h2>Overview unavailable</h2><p>{error}</p></div>;if(!data)return <p className="admin-loading" role="status"><Loader2 className="spin"/>Loading scoped overview…</p>;const cards=[{label:"Open cases",value:data.openCases,href:"/admin?section=cases&status=open"},{label:"Urgent cases",value:data.urgentCases,href:"/admin?section=cases&status=open&severity=high"},{label:"Pending appeals",value:data.pendingAppeals,href:"/admin?section=cases&appeals=true"},{label:"Automated reviews",value:data.automatedReviews,href:"/admin?section=cases&automated=true"},{label:"Restricted users",value:data.restrictedUsers,href:"/admin?section=users&status=restricted"},{label:"Restricted content",value:data.restrictedContent,href:"/admin?section=content&status=restricted"},{label:"Pending staff invitations",value:data.pendingStaffInvitations,href:"/admin?section=staff"},{label:"Audited actions · 24h",value:data.recentAuditedActions,href:"/admin?section=audit"}];return <section className="admin-metric-grid" aria-label="Scoped operational overview">{cards.map((card)=><Link href={card.href} key={card.label}><Gauge aria-hidden="true"/><strong>{card.value}</strong><span>{card.label}</span><small>{card.value===0?"Nothing currently requires attention":"Open working section"}</small></Link>)}</section>}
 
-function SettingRow({ setting, onSaved, onNotice }: { setting: OperationalSetting; onSaved: () => void; onNotice: (value: string) => void }) {
-  const [value, setValue] = useState(String(setting.value ?? ""));
-  const [reason, setReason] = useState("");
-  async function save() {
-    const parsedValue = setting.value_type === "boolean" ? value === "true" : setting.value_type === "integer" ? Number(value) : value;
-    const response = await fetch("/api/v1/admin/settings", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: setting.key, value: parsedValue, reason, idempotencyKey: crypto.randomUUID() }) });
-    const json = await response.json();
-    onNotice(response.ok ? "Operational setting updated and audited." : json.error?.message ?? "Unable to update setting.");
-    if (response.ok) { setReason(""); onSaved(); }
-  }
-  return <article><div><h3>{setting.label}</h3><p>{setting.description}</p><small>{setting.key}</small></div><div className="moderation-actions">
-    {setting.value_type === "boolean" ? <select value={value} onChange={(event) => setValue(event.target.value)}><option value="true">Enabled</option><option value="false">Disabled</option></select> : <input value={value} onChange={(event) => setValue(event.target.value)} type={setting.value_type === "integer" ? "number" : "text"} min={setting.minimum_integer ?? undefined} max={setting.maximum_integer ?? undefined} />}
-    <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required reason" minLength={10} />
-    <button className="button button-primary button-small" disabled={reason.trim().length < 10} onClick={() => void save()}><Settings />Save</button>
-  </div></article>;
-}
+function AdminContentBrowser({context,initialFilters}:{context:StaffContext;initialFilters?:{q?:string;surface?:string;status?:string;institution?:string}}){const [rows,setRows]=useState<ContentRow[]>([]);const [institutions,setInstitutions]=useState<Institution[]>([]);const [query,setQuery]=useState(initialFilters?.q??"");const [surface,setSurface]=useState(initialFilters?.surface??"");const [status,setStatus]=useState(initialFilters?.status??"");const [institution,setInstitution]=useState(initialFilters?.institution??"");const [reason,setReason]=useState("");const [loading,setLoading]=useState(true);const [error,setError]=useState("");const [notice,setNotice]=useState("");
+ const load=useCallback(async()=>{setLoading(true);setError("");const params=new URLSearchParams();if(query)params.set("q",query);if(surface)params.set("surface",surface);if(status)params.set("status",status);if(institution)params.set("institution",institution);try{setRows(await readData(`/api/v1/admin/content?${params}`));const pageParams=new URLSearchParams(params);pageParams.set("section","content");window.history.replaceState(null,"",`/admin?${pageParams}`);}catch(caught){setError(caught instanceof Error?caught.message:"Unable to load content.");}finally{setLoading(false);}},[institution,query,status,surface]);useEffect(()=>{void load();},[load]);useEffect(()=>{if(context.scope==="platform")void readData<Institution[]>("/api/v1/admin/institutions?lifecycle=active&limit=50").then(setInstitutions).catch(()=>setInstitutions([]));},[context.scope]);
+ async function act(row:ContentRow,action:"review_requested"|"remove"|"restrict"|"restore"){if(reason.trim().length<10){setNotice("Enter an operational reason of at least 10 characters.");return;}try{await requestData("/api/v1/admin/content",{action,targetType:row.target_type,targetId:row.id,reason,idempotencyKey:crypto.randomUUID()});setNotice(action==="review_requested"?"Operational review case created and audited.":"Content action applied and audited.");setReason("");await load();}catch(caught){setNotice(caught instanceof Error?caught.message:"Unable to apply content action.");}}
+ const canAct=context.capabilities.includes("content.act");return <section className="admin-content-browser"><form className="admin-filter-grid" onSubmit={(event)=>{event.preventDefault();void load();}}><label className="wide">Search<input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Title, text, campus, or record ID"/></label><label>Surface<select value={surface} onChange={(event)=>setSurface(event.target.value)}><option value="">All surfaces</option>{["social","discussions","organizations","marketplace","events"].map((value)=><option key={value}>{value}</option>)}</select></label><label>Status<select value={status} onChange={(event)=>setStatus(event.target.value)}><option value="">All states</option>{["active","reported","removed","restricted","deleted","suspended","read_only","withdrawn"].map((value)=><option key={value}>{value.replaceAll("_"," ")}</option>)}</select></label>{context.scope==="platform"&&<label>Institution<select value={institution} onChange={(event)=>setInstitution(event.target.value)}><option value="">All institutions</option>{institutions.map((item)=><option value={item.institution_id} key={item.institution_id}>{item.name}</option>)}</select></label>}<button className="button button-primary">Apply filters</button></form>{canAct&&<ReasonField value={reason} onChange={setReason}/>} {notice&&<p className="form-notice" role="status">{notice}</p>}{error&&<div className="admin-state error" role="alert"><AlertTriangle/><h2>Content unavailable</h2><p>{error}</p></div>}{loading&&<p className="admin-loading" role="status"><Loader2 className="spin"/>Loading scoped content…</p>}{!loading&&!error&&!rows.length&&<EmptyState icon={<ShieldCheck/>} title="No content matches these filters" description="Try another surface, state, institution, or search term."/>}<div className="admin-content-results">{rows.map((row)=>{const inactive=["removed","restricted","deleted","suspended","read_only","withdrawn"].includes(row.status);return <article key={`${row.target_type}:${row.id}`}><header><div><span className="ui-badge">{row.surface}</span><h2>{row.title||"Untitled content"}</h2><p>{row.campus_name} · {row.status.replaceAll("_"," ")}</p></div><time>{new Date(row.created_at).toLocaleString()}</time></header><p>{row.excerpt||"No text preview is available."}</p><div className="admin-record-links"><Link href={row.source_href}><ExternalLink/>Open source</Link>{row.moderation_case_id&&<Link href={`/admin?section=cases&report=${row.moderation_case_id}`}>Moderation case · {row.moderation_case_status}</Link>}{row.operational_case_id&&<Link href={`/admin?section=audit&case=${row.operational_case_id}`}>Operational case · {row.operational_case_status}</Link>}</div>{canAct&&row.status!=="deleted"&&<div className="moderation-actions"><button className="button button-ghost button-small" onClick={()=>void act(row,"review_requested")}>Create review case</button>{row.target_type==="organization_channel"&&!inactive&&<button className="button button-ghost button-small" onClick={()=>void act(row,"restrict")}>Make read-only</button>}<button className={inactive?"button button-primary button-small":"button button-danger button-small"} onClick={()=>void act(row,inactive?"restore":"remove")}>{inactive?"Restore":"Remove"}</button></div>}</article>;})}</div></section>}
+
+function ReasonField({value,onChange}:{value:string;onChange:(value:string)=>void}){return <label className="admin-reason">Required operational reason<textarea value={value} onChange={(event)=>onChange(event.target.value)} minLength={10} maxLength={2000}/></label>}
+function SettingRow({setting,onSaved,onNotice}:{setting:OperationalSetting;onSaved:()=>void;onNotice:(value:string)=>void}){const[value,setValue]=useState(String(setting.value??""));const[reason,setReason]=useState("");async function save(){const parsed=setting.value_type==="boolean"?value==="true":setting.value_type==="integer"?Number(value):value;try{await readData("/api/v1/admin/settings",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({key:setting.key,value:parsed,reason,idempotencyKey:crypto.randomUUID()})});onNotice("Operational setting updated and audited.");setReason("");onSaved();}catch(caught){onNotice(caught instanceof Error?caught.message:"Unable to update setting.");}}return <article><div><h3>{setting.label}</h3><p>{setting.description}</p><small>{setting.key}</small></div><div className="moderation-actions">{setting.value_type==="boolean"?<select value={value} onChange={(event)=>setValue(event.target.value)}><option value="true">Enabled</option><option value="false">Disabled</option></select>:<input value={value} onChange={(event)=>setValue(event.target.value)} type={setting.value_type==="integer"?"number":"text"} min={setting.minimum_integer??undefined} max={setting.maximum_integer??undefined}/>}<input value={reason} onChange={(event)=>setReason(event.target.value)} placeholder="Required reason" minLength={10}/><button className="button button-primary button-small" disabled={reason.trim().length<10} onClick={()=>void save()}><Settings/>Save</button></div></article>}

@@ -20,6 +20,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const messageCount = (inbox ?? []).reduce((sum: number, row: { unread_count?: number | string }) => sum + Number(row.unread_count ?? 0), 0);
   const campus = Array.isArray(profile?.campuses) ? profile.campuses[0] : profile?.campuses;
   const isStaff = Boolean(roles?.some(({ role }) => role === "moderator" || role === "admin") || platformRoles?.length);
+  const staffHref = platformRoles?.some(({ role }) => role === "admin") ? "/admin?section=overview" : "/admin?section=cases";
   return (
     <div className="app-frame">
       <AppNavigation
@@ -32,6 +33,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           verified: isStaff || Boolean(profile?.verified_until && new Date(profile.verified_until) > new Date()),
         }}
         isStaff={isStaff}
+        staffHref={staffHref}
         notificationCount={notificationCount ?? 0}
         messageCount={messageCount}
         discussionsEnabled={discussionsEnabled === true}

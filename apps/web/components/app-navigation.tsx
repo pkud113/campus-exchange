@@ -38,6 +38,7 @@ type Props = {
     verified: boolean;
   };
   isStaff: boolean;
+  staffHref: string;
   notificationCount: number;
   messageCount: number;
   discussionsEnabled: boolean;
@@ -83,6 +84,7 @@ function NavSection({ label, entries, path, onNavigate }: { label: string; entri
 export function AppNavigation({
   profile,
   isStaff,
+  staffHref,
   notificationCount: initialNotificationCount,
   messageCount,
   discussionsEnabled,
@@ -197,7 +199,7 @@ export function AppNavigation({
     window.location.assign("/sign-in");
   }
 
-  const { main, mobile, management, account, searchEntry, peopleEntry, organizationsEntry, friendsEntry, notificationsEntry } = buildNavigationModel({ handle: profile.handle, isStaff, discussionsEnabled, notificationCount, messageCount });
+  const { main, mobile, management, account, searchEntry, peopleEntry, organizationsEntry, friendsEntry, notificationsEntry } = buildNavigationModel({ handle: profile.handle, isStaff, staffHref, discussionsEnabled, notificationCount, messageCount });
   const closeMenu = () => setMenuOpen(false);
   const edgeControlLabel = sidebarToggleLabel(sidebarCollapsed);
 

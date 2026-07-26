@@ -11,13 +11,14 @@ export const personaKeys = [
   "organizationMember",
   "unauthorizedNonmember",
   "campusModerator",
+  "campusAdministrator",
   "platformModerator",
   "platformAdministrator",
 ] as const;
 
 export type PersonaKey = (typeof personaKeys)[number];
 
-export const personas: Record<PersonaKey, { email: string; handle: string; displayName: string; campus: "a" | "b"; staff?: "campus_moderator" | "platform_moderator" | "platform_admin" }> = {
+export const personas: Record<PersonaKey, { email: string; handle: string; displayName: string; campus: "a" | "b"; staff?: "campus_moderator" | "campus_admin" | "platform_moderator" | "platform_admin" }> = {
   studentA: { email: "ce.e2e.student.a@msu.edu", handle: "ce_student_a", displayName: "Student A", campus: "a" },
   studentB: { email: "ce.e2e.student.b@msu.edu", handle: "ce_student_b", displayName: "Student B", campus: "a" },
   studentC: { email: "ce.e2e.student.c@illinois.edu", handle: "ce_student_c", displayName: "Student C", campus: "b" },
@@ -28,6 +29,7 @@ export const personas: Record<PersonaKey, { email: string; handle: string; displ
   organizationMember: { email: "ce.e2e.org.member@msu.edu", handle: "ce_org_member", displayName: "Organization Member", campus: "a" },
   unauthorizedNonmember: { email: "ce.e2e.nonmember@msu.edu", handle: "ce_nonmember", displayName: "Unauthorized Nonmember", campus: "a" },
   campusModerator: { email: "ce.e2e.campus.moderator@msu.edu", handle: "ce_campus_moderator", displayName: "Campus Moderator", campus: "a", staff: "campus_moderator" },
+  campusAdministrator: { email: "ce.e2e.campus.admin@msu.edu", handle: "ce_campus_admin", displayName: "Campus Administrator", campus: "a", staff: "campus_admin" },
   platformModerator: { email: "ce.e2e.platform.moderator@illinois.edu", handle: "ce_platform_moderator", displayName: "Platform Moderator", campus: "b", staff: "platform_moderator" },
   platformAdministrator: { email: "ce.e2e.platform.admin@illinois.edu", handle: "ce_platform_admin", displayName: "Platform Administrator", campus: "b", staff: "platform_admin" },
 };
