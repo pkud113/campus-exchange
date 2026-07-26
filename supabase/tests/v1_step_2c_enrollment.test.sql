@@ -1,8 +1,32 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(26);
 
 update public.runtime_settings set value='true'::jsonb where key='universal_onboarding_enabled';
+
+select throws_ok($$
+  insert into auth.users(
+    id,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,aud,role
+  ) values(
+    'c1000000-0000-4000-8000-000000000098','rollout.invalid@msu.edu','test',now(),'{}',
+    jsonb_build_object('registrationGrantId','c2000000-0000-4000-8000-000000000098'),
+    'authenticated','authenticated'
+  )
+$$,'28000','invalid universal enrollment grant','invalid universal grant metadata cannot fall through to reviewed-domain provisioning');
+
+select lives_ok($$
+  insert into auth.users(
+    id,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,aud,role
+  ) values(
+    'c1000000-0000-4000-8000-000000000099','rollout.legacy@msu.edu','test',now(),'{}','{}',
+    'authenticated','authenticated'
+  )
+$$,'reviewed-domain registration without universal grant metadata remains rollback-compatible');
+select is(
+  (select count(*)::integer from public.profiles where id='c1000000-0000-4000-8000-000000000099'),
+  1,
+  'legacy reviewed-domain compatibility still provisions the existing campus'
+);
 
 set local role service_role;
 select lives_ok($$

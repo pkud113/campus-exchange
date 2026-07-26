@@ -46,7 +46,7 @@ select ok((select prosecdef from pg_proc where oid='public.apply_admin_operation
 
 select ok(exists(select 1 from public.registration_email_domain_denials where domain='gmail.com'),'consumer Gmail addresses are denied');
 select ok(exists(select 1 from public.registration_email_domain_denials where domain='mailinator.com' and category='disposable'),'known disposable addresses are denied');
-select is((select value from public.runtime_settings where key='universal_onboarding_enabled'),'false'::jsonb,'universal onboarding remains off for schema rollout');
+select is((select value from public.runtime_settings where key='universal_onboarding_enabled'),'true'::jsonb,'universal onboarding is enabled after the protected rollout migration');
 select is((select value from public.runtime_settings where key='institution_network_discovery_enabled'),'true'::jsonb,'directory-backed discovery is enabled');
 select is((select count(*)::integer from public.institution_directory where id in ('ipeds:170976','ipeds:171137','ipeds:171146')),3,'all three University of Michigan campuses remain explicit directory choices');
 select is(private.region_default_timezone('MI'),'America/Detroit','Michigan lazy provisioning records the predominant regional timezone');
