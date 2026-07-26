@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminCaseQuerySchema,
+  adminContentActionSchema,
+  adminContentQuerySchema,
   auditedAdminActionSchema,
   channelReactionInputSchema,
   friendBoxQuerySchema,
@@ -28,6 +31,14 @@ describe("V1 Step 2C contracts", () => {
     expect(channelReactionInputSchema.parse({ emoji: "👍" })).toEqual({ emoji: "👍" });
     expect(auditedAdminActionSchema.parse({ action: "suspend", targetType: "profile", targetId: uuid, reason: "Verified safety escalation", idempotencyKey: uuid })).toBeTruthy();
     expect(auditedAdminActionSchema.safeParse({ action: "DELETE FROM profiles", targetType: "profile", targetId: uuid, reason: "Verified safety escalation", idempotencyKey: uuid }).success).toBe(false);
+  });
+
+  it("validates operational admin filters and content actions", () => {
+    expect(adminCaseQuerySchema.parse({ status: "open", automated: "true", appeals: "false" })).toMatchObject({ status: "open", automated: true, appeals: false, limit: 50 });
+    expect(adminContentQuerySchema.parse({ surface: "discussions", status: "reported" })).toMatchObject({ surface: "discussions", status: "reported", limit: 50 });
+    expect(adminContentActionSchema.parse({ action: "remove", targetType: "discussion_post", targetId: uuid, reason: "Confirmed policy violation", idempotencyKey: uuid })).toBeTruthy();
+    expect(adminContentActionSchema.safeParse({ action: "delete", targetType: "discussion_post", targetId: uuid, reason: "Confirmed policy violation", idempotencyKey: uuid }).success).toBe(false);
+    expect(adminCaseQuerySchema.safeParse({ campus: "not-a-campus" }).success).toBe(false);
   });
 
   it("normalizes optional notification categories while retaining legacy switches", () => {

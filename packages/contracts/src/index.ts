@@ -542,3 +542,32 @@ export type SocialPostInput = z.infer<typeof socialPostInputSchema>;
 export type SocialFeedQuery = z.infer<typeof socialFeedQuerySchema>;
 export type UnifiedSearchResponse = ApiCollection<UnifiedSearchHit>;
 export type FriendMutationResponse = ApiResource<{ relationshipId: string; status: "pending" | "accepted" | "declined" | "cancelled" | "removed" }>;
+export const adminCaseQuerySchema = z.object({
+  status: z.enum(["open","new","assigned","escalated","awaiting_user_response","resolved","dismissed","appealed"]).optional(),
+  severity: z.enum(["low","medium","high","critical"]).optional(),
+  source: z.enum(["user","automated","user_review"]).optional(),
+  entity: z.string().trim().regex(/^[a-z][a-z0-9_]{1,59}$/).optional(),
+  institution: institutionIdSchema.optional(),
+  campus: uuidSchema.optional(),
+  assignee: z.union([uuidSchema,z.literal("unassigned")]).optional(),
+  automated: z.enum(["true","false"]).transform((value) => value === "true").optional(),
+  appeals: z.enum(["true","false"]).transform((value) => value === "true").optional(),
+  q: z.string().trim().max(160).default(""),
+  cursor: z.string().trim().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50)
+});
+export const adminContentQuerySchema = z.object({
+  q: z.string().trim().max(160).default(""),
+  surface: z.enum(["social","discussions","organizations","marketplace","events"]).optional(),
+  status: z.enum(["active","reported","removed","restricted","deleted","suspended","read_only","withdrawn","draft","reserved","sold"]).optional(),
+  institution: institutionIdSchema.optional(),
+  cursor: z.string().trim().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50)
+});
+export const adminContentActionSchema = z.object({
+  action: z.enum(["review_requested","remove","restrict","restore"]),
+  targetType: z.enum(["social_post","discussion_post","organization","organization_channel","listing","event"]),
+  targetId: uuidSchema,
+  reason: z.string().trim().min(10).max(2000),
+  idempotencyKey: uuidSchema
+}).strict();

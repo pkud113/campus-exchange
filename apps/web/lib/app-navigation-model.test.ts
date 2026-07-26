@@ -12,9 +12,11 @@ describe("V1 information architecture", () => {
 
   it("keeps moderation and feature-gated discussions contextual", () => {
     const student = buildNavigationModel({ handle: "student", isStaff: false, discussionsEnabled: false, notificationCount: 0, messageCount: 0 });
-    const staff = buildNavigationModel({ handle: "staff", isStaff: true, discussionsEnabled: true, notificationCount: 0, messageCount: 0 });
+    const staff = buildNavigationModel({ handle: "staff", isStaff: true, staffHref: "/admin?section=cases", discussionsEnabled: true, notificationCount: 0, messageCount: 0 });
     expect(student.main.some(({ href }) => href === "/discussions")).toBe(false);
     expect(student.management.some(({ href }) => href === "/admin")).toBe(false);
-    expect(staff.management.some(({ href }) => href === "/admin")).toBe(true);
+    expect(staff.management.some(({ href }) => href === "/admin?section=cases")).toBe(true);
+    const platformAdmin = buildNavigationModel({ handle: "admin", isStaff: true, staffHref: "/admin?section=overview", discussionsEnabled: true, notificationCount: 0, messageCount: 0 });
+    expect(platformAdmin.management.some(({ href }) => href === "/admin?section=overview")).toBe(true);
   });
 });

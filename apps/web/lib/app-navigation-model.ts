@@ -20,8 +20,8 @@ import {
 
 export type NavEntry = { href: string; label: string; Icon: LucideIcon; count?: number };
 
-export function buildNavigationModel({ handle, isStaff, discussionsEnabled, notificationCount, messageCount }: {
-  handle: string; isStaff: boolean; discussionsEnabled: boolean; notificationCount: number; messageCount: number;
+export function buildNavigationModel({ handle, isStaff, staffHref = "/admin?section=cases", discussionsEnabled, notificationCount, messageCount }: {
+  handle: string; isStaff: boolean; staffHref?: string; discussionsEnabled: boolean; notificationCount: number; messageCount: number;
 }) {
   const homeEntry: NavEntry = { href: "/home", label: "Home", Icon: Home };
   const searchEntry: NavEntry = { href: "/search", label: "Search", Icon: Search };
@@ -50,7 +50,7 @@ export function buildNavigationModel({ handle, isStaff, discussionsEnabled, noti
     notificationsEntry,
     { href: "/my/listings", label: "My listings", Icon: ShoppingBag },
     { href: "/my/events", label: "My events", Icon: ListChecks },
-    ...(isStaff ? [{ href: "/admin", label: "Moderation", Icon: ShieldCheck }] : []),
+    ...(isStaff ? [{ href: staffHref, label: "Moderation", Icon: ShieldCheck }] : []),
   ];
   const account: NavEntry[] = [
     { href: `/u/${handle}`, label: "Profile", Icon: UserRound },

@@ -35,7 +35,7 @@ async function openChannel(page: Page, name: string) {
 
 test.describe.configure({ mode: "serial" });
 
-test("all twelve authenticated personas establish a verified application session", async ({ browser }) => {
+test("all thirteen authenticated personas establish a verified application session", async ({ browser }) => {
   for (const persona of personaKeys) {
     const context = await personaContext(browser, persona);
     const response = await context.request.get("/api/v1/session");
@@ -57,7 +57,10 @@ test("private message requests never invoke shared-text moderation", async ({ br
     data: {
       profileId: profile.data.id,
       openingMessage: `CE test unavailable private request ${testInfo.project.name}`,
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey:
+        testInfo.project.name === "desktop-chromium"
+          ? "6c994042-b635-4a35-89a0-597b7ee72471"
+          : "910f7ba7-7db2-4ef8-9c91-826f97463543",
     },
   });
   const result = await response.json();
@@ -167,7 +170,7 @@ test("member messaging, announcement restrictions, restricted-channel invisibili
   await expect(page.getByRole("dialog", { name: /Report organization channel/ })).toBeVisible();
   await page.getByLabel("What happened?").fill("Authenticated browser report coverage.");
   await page.getByRole("button", { name: "Submit report" }).click();
-  await expect(page.getByRole("status")).toContainText("Report submitted");
+  await expect(page.getByText("Report submitted to the appropriate safety team.", { exact: true })).toBeVisible();
   await context.close();
 });
 
@@ -256,9 +259,9 @@ test("student appeal surface and MFA-protected moderation appeal handling are av
   await student.context.close();
 
   const staff = await pageFor(browser, "platformModerator");
-  await staff.page.goto("/admin?section=cases");
-  await expect(staff.page.getByRole("heading", { name: "Safety center" })).toBeVisible();
-  await expect(staff.page.getByText(/Platform scope.*MFA protected/)).toBeVisible();
+  await staff.page.goto("/admin?section=cases&appeals=true");
+  await expect(staff.page.getByRole("heading", { name: "Cases & appeals" })).toBeVisible();
+  await expect(staff.page.getByText(/All institutions.*AAL2 protected/)).toBeVisible();
   await expect(staff.page.getByRole("heading", { name: "Appeal review" })).toBeVisible();
   const disposition = staff.page.getByLabel("Disposition").first();
   await expect(disposition).toBeVisible();
@@ -303,4 +306,48 @@ test("authenticated shell has no serious accessibility violations", async ({ bro
   expect(results.violations.filter((violation) => violation.impact === "critical" || violation.impact === "serious")).toEqual([]);
   await expectResponsiveSurface(page);
   await context.close();
+});
+
+test("campus and platform administrators receive complete role-scoped operations consoles", async ({ browser }, testInfo) => {
+  const campus = await pageFor(browser, "campusAdministrator");
+  await campus.page.goto("/admin");
+  await expect(campus.page.getByRole("heading", { name: "Administration console" })).toBeVisible();
+  await expect(campus.page.getByText(/Campus administrator.*Michigan State University.*AAL2/)).toBeVisible();
+  await expect(campus.page.locator(".admin-tabs").getByRole("link", { name: "Cases & appeals" })).toHaveAttribute("aria-current", "page");
+  await expect(campus.page.locator(".admin-tabs").getByRole("link", { name: "Settings" })).toHaveCount(0);
+  await campus.page.goto("/admin?section=content&surface=social");
+  await expect(campus.page.getByRole("heading", { name: "Administration console" })).toBeVisible();
+  await expect(campus.page.locator(".admin-content-results article").first()).toBeVisible();
+  await expect(campus.page.locator(".admin-content-results article").first()).toContainText("Michigan State University");
+  if (testInfo.project.name === "desktop-chromium") {
+    await campus.page.getByLabel("Required operational reason").fill("Authenticated scoped content removal test.");
+    const removeResponse = campus.page.waitForResponse((response) => response.url().endsWith("/api/v1/admin/content") && response.request().method() === "POST");
+    await campus.page.locator(".admin-content-results article").first().getByRole("button", { name: "Remove" }).click();
+    expect((await removeResponse).ok()).toBe(true);
+    await expect(campus.page.getByText("Content action applied and audited.", { exact: true })).toBeVisible();
+    await campus.page.getByLabel("Required operational reason").fill("Authenticated scoped content restoration test.");
+    const restoreResponse = campus.page.waitForResponse((response) => response.url().endsWith("/api/v1/admin/content") && response.request().method() === "POST");
+    await campus.page.locator(".admin-content-results article").first().getByRole("button", { name: "Restore" }).click();
+    expect((await restoreResponse).ok()).toBe(true);
+    await expect(campus.page.getByText("Content action applied and audited.", { exact: true })).toBeVisible();
+    await campus.page.goto("/admin?section=audit");
+    await expect(campus.page.getByText("admin.restore").first()).toBeVisible();
+  }
+  const campusAxe = await new AxeBuilder({ page: campus.page }).analyze();
+  expect(campusAxe.violations.filter((item) => item.impact === "critical" || item.impact === "serious")).toEqual([]);
+  await expectResponsiveSurface(campus.page);
+  await campus.context.close();
+
+  const platform = await pageFor(browser, "platformAdministrator");
+  await platform.page.goto("/admin");
+  await expect(platform.page.getByText(/Platform administrator.*All institutions.*AAL2/)).toBeVisible();
+  await expect(platform.page.locator(".admin-tabs").getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+  await expect(platform.page.locator(".admin-tabs").getByRole("link", { name: "Settings" })).toBeVisible();
+  await expect(platform.page.locator(".admin-metric-grid a")).toHaveCount(8);
+  await platform.page.goto("/admin?section=content");
+  await expect(platform.page.getByLabel("Institution")).toBeVisible();
+  const platformAxe = await new AxeBuilder({ page: platform.page }).analyze();
+  expect(platformAxe.violations.filter((item) => item.impact === "critical" || item.impact === "serious")).toEqual([]);
+  await expectResponsiveSurface(platform.page);
+  await platform.context.close();
 });

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(45);
+select plan(53);
 
 select ok((select relrowsecurity from pg_class where oid='public.registration_enrollment_grants'::regclass),'enrollment grants have RLS');
 select ok((select relrowsecurity from pg_class where oid='public.campus_membership_verifications'::regclass),'membership verification history has RLS');
@@ -51,6 +51,15 @@ select is((select value from public.runtime_settings where key='institution_netw
 select is((select count(*)::integer from public.institution_directory where id in ('ipeds:170976','ipeds:171137','ipeds:171146')),3,'all three University of Michigan campuses remain explicit directory choices');
 select is(private.region_default_timezone('MI'),'America/Detroit','Michigan lazy provisioning records the predominant regional timezone');
 select is((select count(*)::integer from unnest(enum_range(null::public.membership_verification_basis)) basis),5,'verification basis distinguishes reviewed, website, shared, explicit, and legacy assignment');
+
+select ok(has_function_privilege('authenticated','public.admin_dashboard_summary()','EXECUTE'),'AAL2 staff may request a scoped operations summary');
+select ok(not has_function_privilege('anon','public.admin_dashboard_summary()','EXECUTE'),'anonymous users cannot read the operations summary');
+select ok(has_function_privilege('authenticated','public.admin_case_queue_v3(text,text,text,text,text,uuid,text,boolean,boolean,text,timestamptz,uuid,integer)','EXECUTE'),'staff may use the server-filtered case queue');
+select ok(not has_function_privilege('anon','public.admin_case_queue_v3(text,text,text,text,text,uuid,text,boolean,boolean,text,timestamptz,uuid,integer)','EXECUTE'),'anonymous users cannot use the case queue');
+select ok(has_function_privilege('authenticated','public.admin_content_directory(text,text,text,text,timestamptz,uuid,integer)','EXECUTE'),'staff may use the scoped content directory');
+select ok(not has_function_privilege('anon','public.admin_content_directory(text,text,text,text,timestamptz,uuid,integer)','EXECUTE'),'anonymous users cannot read managed content');
+select ok(has_function_privilege('authenticated','public.apply_admin_content_action(text,text,uuid,text,uuid)','EXECUTE'),'staff may request audited content actions');
+select ok(not has_function_privilege('anon','public.apply_admin_content_action(text,text,uuid,text,uuid)','EXECUTE'),'anonymous users cannot mutate managed content');
 
 select * from finish();
 rollback;
