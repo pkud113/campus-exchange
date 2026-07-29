@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createClient, type Session } from "@supabase/supabase-js";
-import { e2eOrganization, personaKeys, personas, personaStorageState, type PersonaKey } from "./personas";
+import { e2eOrganization, onboardingStorageState, personaKeys, personas, personaStorageState, type PersonaKey } from "./personas";
 
 const password = "CampusExchange-Local-E2E-2026!";
 
@@ -94,6 +94,18 @@ export default async function globalSetup() {
       profileIds[key] = created.data.user.id;
     }
   }
+  const onboardingUsers = {} as Record<"desktop" | "mobile", { email: string; id: string }>;
+  for (const variant of ["desktop", "mobile"] as const) {
+    const email = `ce.e2e.onboarding.${variant}@msu.edu`;
+    const stale = existing.data.users.find((candidate) => candidate.email === email);
+    if (stale) {
+      const removed = await admin.auth.admin.deleteUser(stale.id);
+      if (removed.error) throw removed.error;
+    }
+    const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+    if (created.error || !created.data.user) throw created.error ?? new Error(`Unable to create onboarding ${variant}.`);
+    onboardingUsers[variant] = { email, id: created.data.user.id };
+  }
 
   const organizationId = randomUUID();
   const reportId = randomUUID();
@@ -135,5 +147,11 @@ commit;`;
     const statePath = personaStorageState(key);
     const session = await authenticatedSession(url, publishableKey, key, existsSync(statePath));
     if (session) await writeFile(statePath, JSON.stringify(cookieState(url, session)), "utf8");
+  }
+  for (const variant of ["desktop", "mobile"] as const) {
+    const client = createClient(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const signedIn = await client.auth.signInWithPassword({ email: onboardingUsers[variant].email, password });
+    if (signedIn.error || !signedIn.data.session) throw signedIn.error ?? new Error(`Unable to sign in onboarding ${variant}.`);
+    await writeFile(onboardingStorageState(variant), JSON.stringify(cookieState(url, signedIn.data.session)), "utf8");
   }
 }

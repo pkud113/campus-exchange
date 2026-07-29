@@ -39,3 +39,7 @@ export const e2eOrganization = { slug: "ce-e2e-product-alignment", name: "CE Pro
 export function personaStorageState(persona: PersonaKey) {
   return path.resolve(process.cwd(), ".playwright", ".auth", `${persona}.json`);
 }
+
+export function onboardingStorageState(variant: "desktop" | "mobile") {
+  return path.resolve(process.cwd(), ".playwright", ".auth", `onboarding-${variant}.json`);
+}

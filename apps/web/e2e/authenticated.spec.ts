@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { e2eOrganization, personaKeys, personas, personaStorageState, type PersonaKey } from "./personas";
+import { e2eOrganization, onboardingStorageState, personaKeys, personas, personaStorageState, type PersonaKey } from "./personas";
 
 async function personaContext(browser: Browser, persona: PersonaKey) {
   return browser.newContext({ storageState: personaStorageState(persona) });
@@ -297,6 +297,62 @@ test("registration preserves all University of Michigan shared-domain selections
       domain: "umich.edu"
     });
   }
+});
+
+test("verified MSU onboarding is deterministic while shared content remains fail-closed", async ({ browser }, testInfo) => {
+  const variant = testInfo.project.name === "desktop-chromium" ? "desktop" : "mobile";
+  const context = await browser.newContext({ storageState: onboardingStorageState(variant) });
+  const page = await context.newPage();
+  const password = `CampusExchange-Onboarding-${variant}-2026!`;
+  const headers = { origin: "http://127.0.0.1:3100", "content-type": "application/json" };
+
+  for (const [username, status, code] of [
+    ["admin", 422, "invalid_username"],
+    ["f_u_c_k_you", 422, "invalid_username"],
+    ["аdmin", 422, "invalid_username"],
+    [personas.studentA.handle, 409, "conflict"],
+  ] as const) {
+    const rejected = await context.request.post("/api/v1/auth/onboarding", {
+      headers,
+      data: { username, password },
+    });
+    const body = await rejected.json();
+    expect(rejected.status(), JSON.stringify(body)).toBe(status);
+    expect(body.error?.code).toBe(code);
+  }
+
+  const username = variant === "desktop" ? "ce_test_unavailable_d" : "ce_test_unavailable_m";
+  await page.goto("/onboarding");
+  await page.getByLabel("Username").fill(username);
+  await page.getByLabel(/^Password/).fill(password);
+  await page.getByLabel("Confirm password").fill(password);
+  await page.getByRole("button", { name: "Finish account setup" }).click();
+  await expect(page).toHaveURL(/\/home$/);
+
+  const sessionResponse = await context.request.get("/api/v1/session");
+  const session = await sessionResponse.json();
+  expect(sessionResponse.ok(), JSON.stringify(session)).toBe(true);
+  expect(session.data.profile.handle).toBe(username);
+  expect(session.data.profile.status).toBe("active");
+  expect(session.data.profile.onboarding_completed_at).toBeTruthy();
+  expect(session.data.profile.password_setup_required).toBe(false);
+
+  const blocked = await context.request.post("/api/v1/social/posts", {
+    headers,
+    data: {
+      body: `CE test unavailable shared post ${variant}`,
+      mediaIds: [],
+      visibility: "campus_only",
+      organizationId: null,
+      idempotencyKey: variant === "desktop"
+        ? "d3000000-0000-4000-8000-000000000001"
+        : "d3000000-0000-4000-8000-000000000002",
+    },
+  });
+  const blockedBody = await blocked.json();
+  expect(blocked.status(), JSON.stringify(blockedBody)).toBe(503);
+  expect(blockedBody.error?.code).toBe("moderation_unavailable");
+  await context.close();
 });
 
 test("authenticated shell has no serious accessibility violations", async ({ browser }) => {

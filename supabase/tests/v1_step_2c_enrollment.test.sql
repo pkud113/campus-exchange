@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(26);
+select plan(30);
 
 update public.runtime_settings set value='true'::jsonb where key='universal_onboarding_enabled';
 
@@ -81,6 +81,20 @@ reset role;
 
 select is((select count(*)::integer from public.role_assignments where profile_id='c1000000-0000-4000-8000-000000000001' and role='student'),1,'completion assigns exactly one student role');
 select is((select count(*)::integer from public.audit_log where actor_id='c1000000-0000-4000-8000-000000000001' and action='membership.verified'),1,'completion records a protected audit event');
+
+set local role authenticated;
+select lives_ok(
+  $$select public.complete_onboarding('ce_test_unavailable_aamu')$$,
+  'a verified non-launch student completes onboarding without shared-text moderation'
+);
+reset role;
+select is((select handle::text from public.profiles where id='c1000000-0000-4000-8000-000000000001'),'ce_test_unavailable_aamu','non-launch onboarding stores the safe immutable username');
+select ok((select status='active' and onboarding_completed_at is not null and not password_setup_required from public.profiles where id='c1000000-0000-4000-8000-000000000001'),'non-launch profile provisioning is complete');
+select is(
+  (select p.campus_id from public.profiles p where p.id='c1000000-0000-4000-8000-000000000001'),
+  (select i.campus_id from public.institution_directory i where i.id='ipeds:100654'),
+  'non-launch onboarding preserves the selected campus assignment'
+);
 
 set local role service_role;
 select throws_ok($$
