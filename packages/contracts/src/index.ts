@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { academicField, biography, displayName, graduationYear, interests, searchQuery } from "@campus-exchange/validation";
+import { academicField, biography, displayName, graduationYear, interests, searchQuery, usernameInput } from "@campus-exchange/validation";
 import type { ApiCollection, ApiResource, UnifiedSearchHit } from "@campus-exchange/shared-types";
 export { openApiDocument } from "./openapi";
 export type { ApiCollection, ApiResource, UnifiedSearchHit } from "@campus-exchange/shared-types";
+export { evaluateUsernameSafety, normalizeUsernameInput, usernameSafetyMessage } from "@campus-exchange/validation";
 
 export const uuidSchema = z.string().uuid();
 export const utcDateSchema = z.string().datetime({ offset: true });
@@ -60,7 +61,7 @@ export const loginInputSchema = z.object({
   turnstileToken: turnstileTokenSchema,
   next: z.string().max(512).refine((value) => safeInternalRedirectPath(value) !== null, "Redirect path must stay within Campus Exchange.").transform((value) => safeInternalRedirectPath(value) as string).optional()
 }).strict();
-export const onboardingInputSchema = z.object({ username: usernameSchema, password: passwordSchema });
+export const onboardingInputSchema = z.object({ username: usernameInput, password: passwordSchema }).strict();
 export const passwordResetStartSchema = z.object({ identifier: loginIdentifierSchema, turnstileToken: turnstileTokenSchema });
 export const passwordResetCompleteSchema = z.object({ password: passwordSchema });
 export const notificationPreferenceInputSchema = z.object({
@@ -260,7 +261,7 @@ export const discussionOwnershipSchema = z.object({
   idempotencyKey: uuidSchema
 });
 
-export type ApiErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "service_unconfigured" | "content_blocked" | "content_review_required" | "moderation_unavailable" | "internal_error";
+export type ApiErrorCode = "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "invalid_username" | "rate_limited" | "service_unavailable" | "service_unconfigured" | "content_blocked" | "content_review_required" | "moderation_unavailable" | "internal_error";
 export type ApiError = { error: { code: ApiErrorCode; message: string; requestId: string; details?: unknown } };
 export type ApiPage<T> = { data: T[]; page: { nextCursor: string | null } };
 
