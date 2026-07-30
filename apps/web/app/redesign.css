@@ -1788,6 +1788,7 @@ svg { flex: 0 0 auto; }
   background: var(--surface);
   color: var(--muted);
   font-weight: 750;
+  transition-property: border-color, box-shadow, transform, opacity;
 }
 .request-tabs a:hover,
 .request-tabs button:hover,
