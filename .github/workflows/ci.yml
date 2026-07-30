@@ -47,6 +47,8 @@ jobs:
           echo "CONTENT_MODERATION_PROVIDER=deterministic" >> "$GITHUB_ENV"
       - run: pnpm typecheck
       - run: pnpm lint
+      - name: Confirm native mobile is explicitly outside web-launch test scope
+        run: pnpm test:mobile:status
       - run: pnpm test
       - run: pnpm build
       - name: Install Playwright Chromium

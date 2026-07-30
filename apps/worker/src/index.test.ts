@@ -60,4 +60,9 @@ describe("worker delivery helpers", () => {
     expect(notificationEmailAllowed(overnight, "discussions", new Date("2026-01-01T12:00:00Z"))).toBe(false);
     expect(notificationEmailAllowed(null, "messages", new Date("2026-01-01T23:00:00Z"))).toBe(true);
   });
+  it("falls back safely when a campus timezone is invalid", () => {
+    const preference = { email_messages: true, quiet_hours_start: 22, quiet_hours_end: 7 };
+    expect(() => notificationEmailAllowed(preference, "messages", new Date("2026-01-01T23:00:00Z"), "Not/A_Timezone")).not.toThrow();
+    expect(notificationEmailAllowed(preference, "messages", new Date("2026-01-01T23:00:00Z"), "Not/A_Timezone")).toBe(false);
+  });
 });

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(35);
 
 update public.runtime_settings set value='true'::jsonb where key='universal_onboarding_enabled';
 
@@ -145,6 +145,58 @@ reset role;
 select is((select count(*)::integer from public.registration_enrollment_grants where email_hash in (repeat('2',64),repeat('4',64),repeat('6',64)) and assignment_basis='shared_selected'),3,'all Michigan grants retain shared-selected confidence');
 select is((select count(distinct institution_id)::integer from public.registration_enrollment_grants where email_hash in (repeat('2',64),repeat('4',64),repeat('6',64))),3,'the exact selected Michigan institution remains distinct');
 select is((select count(*)::integer from public.campuses where provisioned_from_institution_id='ipeds:100654'),1,'lazy provisioning is collision-safe through one institution-linked campus');
+
+set local role service_role;
+select throws_ok(
+  $$select * from public.create_registration_enrollment_grant(
+    'ipeds:170976',repeat('8',64),'unreviewed.example',repeat('9',64)
+  )$$,
+  '42501','institution domain review required',
+  'unknown domains are routed to review instead of trusting the selected institution'
+);
+select lives_ok(
+  $$select * from public.create_registration_enrollment_grant(
+    'ipeds:100654',
+    encode(extensions.digest('disabled-campus@aamu.edu','sha256'),'hex'),
+    'aamu.edu',repeat('a',64)
+  )$$,
+  'a valid grant can be minted before a campus lifecycle change'
+);
+reset role;
+update public.registration_enrollment_grants
+set id='c2000000-0000-4000-8000-000000000020'
+where email_hash=encode(extensions.digest('disabled-campus@aamu.edu','sha256'),'hex');
+insert into auth.users(
+  id,email,encrypted_password,email_confirmed_at,raw_app_meta_data,
+  raw_user_meta_data,aud,role
+) values(
+  'c1000000-0000-4000-8000-000000000020','disabled-campus@aamu.edu',
+  'test',now(),'{}',
+  jsonb_build_object('registrationGrantId','c2000000-0000-4000-8000-000000000020'),
+  'authenticated','authenticated'
+);
+update public.campuses
+set status='disabled'
+where id=(select campus_id from public.institution_directory where id='ipeds:100654');
+select set_config('request.jwt.claim.sub','c1000000-0000-4000-8000-000000000020',true);
+select set_config('request.jwt.claims','{"sub":"c1000000-0000-4000-8000-000000000020","role":"authenticated","aal":"aal1"}',true);
+set local role authenticated;
+select throws_ok(
+  $$select * from public.complete_registration_enrollment('c2000000-0000-4000-8000-000000000020')$$,
+  '42501','campus enrollment unavailable',
+  'grant consumption cannot silently re-enable a disabled campus'
+);
+reset role;
+select is(
+  (select status::text from public.campuses where id=(select campus_id from public.institution_directory where id='ipeds:100654')),
+  'disabled',
+  'failed enrollment leaves the disabled campus lifecycle unchanged'
+);
+select is(
+  (select consumed_at from public.registration_enrollment_grants where id='c2000000-0000-4000-8000-000000000020'),
+  null,
+  'a grant rejected by campus lifecycle remains unconsumed for operator recovery'
+);
 
 select * from finish();
 rollback;

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(17);
 select set_config('ce.moderation_test_bypass','off',false);
 
 insert into auth.users(id,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,aud,role) values
@@ -24,10 +24,10 @@ select throws_ok($$insert into public.listings(campus_id,seller_id,title,descrip
   values('00000000-0000-4000-8000-000000000001',auth.uid(),'Unchecked listing','This content has no clearance.','books','good',1000,'2b000000-0000-4000-8000-000000000011','campus_only',array['campus_pickup']::public.listing_exchange_method[],false)$$,'42501','moderation clearance required','unchecked shared text is rejected');
 
 reset role;
-insert into public.content_moderation_checks(actor_id,campus_id,surface,operation,content_hash,outcome,categories,provider,model,policy_version)
+insert into public.content_moderation_checks(actor_id,campus_id,surface,operation,content_hash,outcome,categories,provider,model,policy_version,idempotency_key)
 values('2b000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','listing','create',
   private.content_moderation_hash('listing','create',jsonb_build_object('title','Checked listing','description','This content has a valid clearance.')),
-  'allow','{}','fixture','fixture-v1','ce-shared-text-2026-07-v1');
+  'allow','{}','fixture','fixture-v1','ce-shared-text-2026-07-v1','2b000000-0000-4000-8000-000000000012');
 set local role authenticated;
 select lives_ok($$insert into public.listings(id,campus_id,seller_id,title,description,category,condition,price_cents,idempotency_key,visibility,exchange_methods,legacy_exchange_unspecified)
   values('2b000000-0000-4000-8000-000000000020','00000000-0000-4000-8000-000000000001',auth.uid(),'Checked listing','This content has a valid clearance.','books','good',1000,'2b000000-0000-4000-8000-000000000012','campus_only',array['campus_pickup']::public.listing_exchange_method[],false)$$,'matching clearance permits the authorized write');
@@ -38,8 +38,8 @@ select throws_ok($$insert into public.listings(campus_id,seller_id,title,descrip
   values('00000000-0000-4000-8000-000000000001',auth.uid(),'Checked listing','This content has a valid clearance.','books','good',1000,'2b000000-0000-4000-8000-000000000013','campus_only',array['campus_pickup']::public.listing_exchange_method[],false)$$,'42501','moderation clearance required','consumed clearance cannot be replayed');
 
 reset role;
-insert into public.content_moderation_checks(actor_id,campus_id,surface,operation,content_hash,outcome,categories,provider,model,policy_version)
-values('2b000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','listing','create',private.content_moderation_hash('listing','create',jsonb_build_object('title','Blocked listing','description','This fixture represents blocked text.')),'block',array['targeted_abuse'],'fixture','fixture-v1','ce-shared-text-2026-07-v1');
+insert into public.content_moderation_checks(actor_id,campus_id,surface,operation,content_hash,outcome,categories,provider,model,policy_version,idempotency_key)
+values('2b000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','listing','create',private.content_moderation_hash('listing','create',jsonb_build_object('title','Blocked listing','description','This fixture represents blocked text.')),'block',array['targeted_abuse'],'fixture','fixture-v1','ce-shared-text-2026-07-v1','2b000000-0000-4000-8000-000000000014');
 set local role authenticated;
 select throws_ok($$insert into public.listings(campus_id,seller_id,title,description,category,condition,price_cents,idempotency_key,visibility,exchange_methods,legacy_exchange_unspecified)
   values('00000000-0000-4000-8000-000000000001',auth.uid(),'Blocked listing','This fixture represents blocked text.','books','good',1000,'2b000000-0000-4000-8000-000000000014','campus_only',array['campus_pickup']::public.listing_exchange_method[],false)$$,'42501','moderation clearance required','blocked decisions never authorize publication');
@@ -55,6 +55,37 @@ values('2b000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000
 set local role authenticated;
 select lives_ok($$update public.listings set title='Updated title' where id='2b000000-0000-4000-8000-000000000020'$$,'valid target-bound edit is accepted');
 select is((select title from public.listings where id='2b000000-0000-4000-8000-000000000020'),'Updated title','authorized edit persists');
+
+reset role;
+insert into public.content_moderation_checks(
+  actor_id,campus_id,surface,operation,content_hash,outcome,categories,
+  provider,model,policy_version,idempotency_key
+) values(
+  '2b000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000001','listing','create',
+  private.content_moderation_hash('listing','create',jsonb_build_object(
+    'title','Key-bound listing','description','This clearance belongs to another request.'
+  )),
+  'allow','{}','fixture','fixture-v1','ce-shared-text-2026-07-v1',
+  '2b000000-0000-4000-8000-000000000030'
+);
+set local role authenticated;
+select throws_ok($$
+  insert into public.listings(
+    campus_id,seller_id,title,description,category,condition,price_cents,
+    idempotency_key,visibility,exchange_methods,legacy_exchange_unspecified
+  ) values(
+    '00000000-0000-4000-8000-000000000001',auth.uid(),
+    'Key-bound listing','This clearance belongs to another request.',
+    'books','good',1000,'2b000000-0000-4000-8000-000000000031',
+    'campus_only',array['campus_pickup']::public.listing_exchange_method[],false
+  )
+$$,'42501','moderation clearance required','a create clearance cannot cross idempotency keys');
+reset role;
+select ok(
+  (select consumed_at is null from public.content_moderation_checks where idempotency_key='2b000000-0000-4000-8000-000000000030'),
+  'a mismatched idempotency key does not consume the other request clearance'
+);
 
 select * from finish();
 rollback;

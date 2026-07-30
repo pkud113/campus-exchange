@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "node -e \"console.error('Native mobile tests are not implemented; mobile is excluded from web-launch CI.'); process.exit(1)\"",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

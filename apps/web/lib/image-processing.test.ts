@@ -15,6 +15,12 @@ const png = (width = 10, height = 10) =>
     (height >>> 24) & 0xff, (height >>> 16) & 0xff, (height >>> 8) & 0xff, height & 0xff,
   ]).buffer;
 
+const heic = () => new Uint8Array([
+  0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70,
+  0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0,
+  0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0,
+]).buffer;
+
 function imagesBinding(response: () => Response): CloudflareImagesBinding {
   return {
     info: async () => ({ width: 10, height: 10 }),
@@ -63,6 +69,25 @@ describe("prepareImageForStorage", () => {
         images: imagesBinding(() => new Response()),
       }),
     ).rejects.toBeInstanceOf(ImageValidationError);
+  });
+
+  it.each(["image/heic", "image/heif"] as const)("never stores unverified %s fallback bytes", async (declaredType) => {
+    const bytes = declaredType === "image/heic"
+      ? heic()
+      : new Uint8Array([0,0,0,24,0x66,0x74,0x79,0x70,0x6d,0x69,0x66,0x31,0,0,0,0,0x6d,0x69,0x66,0x31,0,0,0,0]).buffer;
+    const metadataFailure: CloudflareImagesBinding = {
+      info: async () => { throw new Error("metadata unavailable"); },
+      input: () => ({ transform: () => ({ output: async () => ({ response: () => new Response(null, { status: 503 }) }) }) }),
+    };
+    await expect(prepareImageForStorage({ bytes, declaredType, images: metadataFailure })).rejects.toBeInstanceOf(ImageValidationError);
+  });
+
+  it("rejects HEIC when transformation fails even after dimensions are verified", async () => {
+    await expect(prepareImageForStorage({
+      bytes: heic(),
+      declaredType: "image/heic",
+      images: imagesBinding(() => new Response(null, { status: 503 })),
+    })).rejects.toBeInstanceOf(ImageValidationError);
   });
 });
 

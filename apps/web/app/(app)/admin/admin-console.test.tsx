@@ -31,4 +31,11 @@ describe("operational admin console", () => {
     expect(content).toContain('requireStaffCapability(request, "content.act")');
     expect(content).toContain('rpc("apply_admin_content_action"');
   });
+
+  it("loads users through the scope-safe projection instead of a direct profile join", () => {
+    const users = readFileSync(new URL("../../api/v1/admin/users/route.ts", import.meta.url), "utf8");
+    expect(users).toContain('requireStaffCapability(request, "users.read")');
+    expect(users).toContain('rpc("admin_user_directory"');
+    expect(users).not.toContain('.from("profiles")');
+  });
 });

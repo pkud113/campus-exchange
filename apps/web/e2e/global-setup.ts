@@ -87,6 +87,8 @@ export default async function globalSetup() {
   for (const key of personaKeys) {
     const found = existing.data.users.find((candidate) => candidate.email === personas[key].email);
     if (found) {
+      const updated = await admin.auth.admin.updateUserById(found.id, { password, email_confirm: true });
+      if (updated.error) throw updated.error;
       profileIds[key] = found.id;
     } else {
       const created = await admin.auth.admin.createUser({ email: personas[key].email, password, email_confirm: true });
@@ -94,13 +96,23 @@ export default async function globalSetup() {
       profileIds[key] = created.data.user.id;
     }
   }
+  for (const key of personaKeys.filter((candidate) => personas[candidate].staff)) {
+    const factors = await admin.auth.admin.mfa.listFactors({ userId: profileIds[key] });
+    if (factors.error) throw factors.error;
+    for (const factor of factors.data.factors) {
+      const removed = await admin.auth.admin.mfa.deleteFactor({ userId: profileIds[key], id: factor.id });
+      if (removed.error) throw removed.error;
+    }
+  }
   const onboardingUsers = {} as Record<"desktop" | "mobile", { email: string; id: string }>;
   for (const variant of ["desktop", "mobile"] as const) {
     const email = `ce.e2e.onboarding.${variant}@msu.edu`;
     const stale = existing.data.users.find((candidate) => candidate.email === email);
     if (stale) {
-      const removed = await admin.auth.admin.deleteUser(stale.id);
-      if (removed.error) throw removed.error;
+      const updated = await admin.auth.admin.updateUserById(stale.id, { password, email_confirm: true });
+      if (updated.error) throw updated.error;
+      onboardingUsers[variant] = { email, id: stale.id };
+      continue;
     }
     const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
     if (created.error || !created.data.user) throw created.error ?? new Error(`Unable to create onboarding ${variant}.`);
@@ -124,6 +136,11 @@ delete from public.friend_relationships where profile_low_id in (${fixtureIds}) 
 delete from public.social_posts where author_profile_id in (${fixtureIds});
 delete from public.platform_role_assignments where profile_id in (${fixtureIds});
 delete from public.role_assignments where profile_id in (${fixtureIds});
+set local session_replication_role=replica;
+update public.profiles set handle=null,status='pending',onboarding_completed_at=null,
+  password_setup_required=true
+where id in ('${onboardingUsers.desktop.id}','${onboardingUsers.mobile.id}');
+set local session_replication_role=origin;
 ${profilesSql}
 insert into public.role_assignments(profile_id,campus_id,role,granted_by) values
 ('${profileIds.studentA}','${campusA}','student',null),('${profileIds.studentB}','${campusA}','student',null),('${profileIds.studentC}','${campusB}','student',null),
