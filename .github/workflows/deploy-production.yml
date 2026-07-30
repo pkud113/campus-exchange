@@ -111,10 +111,47 @@ jobs:
       - name: Deploy forward-compatible background worker
         run: pnpm --filter @campus-exchange/worker run deploy
 
+      - name: Verify forward-compatible worker health
+        shell: bash
+        run: |
+          for attempt in {1..18}; do
+            if curl --fail-with-body --silent --show-error \
+              https://worker-health.campus-exchange.net/health \
+              | jq -e '.status == "ok" and .service == "campus-exchange-worker"
+                and .checks.database == true
+                and .checks.outbox == true
+                and .checks.recentDeadLetters == true
+                and .checks.scheduledBatch == true
+                and .checks.maintenance == true
+                and .checks.objectStorage == true' >/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
       - name: Apply production database migrations
         run: |
           supabase db push --linked --include-all
           supabase db advisors --linked --type all --level warn --fail-on error
+
+      - name: Verify worker health after migrations
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if curl --fail-with-body --silent --show-error \
+              https://worker-health.campus-exchange.net/health \
+              | jq -e '.status == "ok" and .checks.database == true
+                and .checks.outbox == true
+                and .checks.recentDeadLetters == true
+                and .checks.scheduledBatch == true
+                and .checks.maintenance == true
+                and .checks.objectStorage == true' >/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
 
       - name: Configure Supabase Auth email delivery
         shell: bash

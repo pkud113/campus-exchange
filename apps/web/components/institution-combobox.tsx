@@ -36,6 +36,10 @@ export function InstitutionCombobox({
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (selected) setQuery(selected.name);
+  }, [selected]);
+
+  useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {

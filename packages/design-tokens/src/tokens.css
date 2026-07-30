@@ -48,6 +48,7 @@
   --ce-text-muted: #4e5c54;
   --ce-border: #d9dedb;
   --ce-brand: #214f3d;
+  --ce-brand-contrast: #ffffff;
   --ce-brand-hover: #2f6b51;
   --ce-brand-soft: #dcefe4;
   --ce-focus: #285f87;
@@ -84,6 +85,7 @@
   --ce-text-muted: #a8b5ae;
   --ce-border: #34423a;
   --ce-brand: #70c49a;
+  --ce-brand-contrast: #102019;
   --ce-brand-hover: #8ad5ad;
   --ce-brand-soft: #233c2e;
   --ce-focus: #8bc7ef;

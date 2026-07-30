@@ -2,6 +2,12 @@ import { contentModerationReviewSchema } from "@campus-exchange/contracts";
 import { NextResponse } from "next/server";
 import { apiData, enforceRateLimit, mutationError, parseJson, requireVerified, verifyMutationOrigin } from "@/lib/api";
 
+export async function GET(request: Request) {
+  const context=await requireVerified(request);if(context instanceof NextResponse)return context;
+  const{data,error}=await context.supabase.rpc("my_content_moderation_reviews");
+  return error?mutationError(request,error,"Unable to load content review status."):apiData(request,data??[]);
+}
+
 export async function POST(request: Request) {
   const originError=verifyMutationOrigin(request);if(originError)return originError;
   const context=await requireVerified(request);if(context instanceof NextResponse)return context;

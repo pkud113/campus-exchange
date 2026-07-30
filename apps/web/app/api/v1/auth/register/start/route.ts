@@ -35,10 +35,22 @@ export async function POST(request: Request) {
         domain
       });
     }
-    const { data: universalSetting } = await admin.from("runtime_settings")
+    const { data: universalSetting, error: universalSettingError } = await admin.from("runtime_settings")
       .select("value")
       .eq("key", "universal_onboarding_enabled")
       .maybeSingle();
+    if (universalSettingError || !universalSetting || typeof universalSetting.value !== "boolean") {
+      console.error(JSON.stringify({
+        level: "error",
+        event: "registration_setting_unavailable",
+        requestId: request.headers.get("x-request-id") ?? "unknown",
+        databaseCode: universalSettingError?.code ?? (universalSetting ? "invalid_value" : "missing_setting"),
+      }));
+      return apiError(request, 503, "service_unavailable", registrationOutcomeMessages.GLOBAL_SERVICE_UNAVAILABLE, {
+        outcome: "GLOBAL_SERVICE_UNAVAILABLE",
+        retryable: true,
+      });
+    }
     const universalEnabled = universalSetting?.value === true;
     if (universalEnabled) {
       const requesterHash = await sha256(clientAddress);
@@ -51,6 +63,40 @@ export async function POST(request: Request) {
       });
       if (grantError) {
         const denied = grantError.message.includes("consumer") || grantError.message.includes("disposable");
+        const reviewRequired = grantError.message.includes("institution domain review required");
+        if (reviewRequired) {
+          try {
+            const verification = await beginInstitutionDomainVerification({
+              institutionId: institution.id,
+              institutionName: institution.name,
+              email: input.email,
+              domain,
+              requesterAddress: clientAddress,
+            });
+            return apiData(request, {
+              sent: true,
+              verificationKind: "domain",
+              challengeId: verification.challengeId,
+              expiresAt: verification.expiresAt,
+              outcome: "DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED" as const,
+              message: registrationOutcomeMessages.DIRECTORY_LISTED_DOMAIN_REVIEW_REQUIRED,
+              institution: institution.name,
+              domain,
+            }, 202);
+          } catch (verificationError) {
+            console.error(JSON.stringify({
+              level: "error",
+              event: "registration_domain_verification_failed",
+              requestId: request.headers.get("x-request-id") ?? "unknown",
+              databaseCode: grantError.code ?? "unknown",
+              deliveryCode: verificationError instanceof Error ? verificationError.message : "unknown",
+            }));
+            return apiError(request, 503, "service_unavailable", registrationOutcomeMessages.GLOBAL_SERVICE_UNAVAILABLE, {
+              outcome: "GLOBAL_SERVICE_UNAVAILABLE",
+              retryable: true,
+            });
+          }
+        }
         return apiError(request, denied ? 403 : 400, denied ? "forbidden" : "bad_request", denied
           ? "Use an institution-issued mailbox. Consumer and disposable email providers are not eligible."
           : "This institution and email combination is not eligible for registration.");

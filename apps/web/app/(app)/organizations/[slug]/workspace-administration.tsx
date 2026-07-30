@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ShieldCheck, X } from "lucide-react";
+import { RoleColorSwatch } from "@/components/role-color-swatch";
 
 type Role = { id: string; builtin_key: string | null; name: string; color: string; sort_position: number; authority_rank: number; permissions: string[]; is_assignable: boolean };
 type Member = { profile_id: string; handle: string; display_name: string | null; role: string };
@@ -123,7 +124,7 @@ export function WorkspaceAdministration({ slug, roles, members, channels, roleOv
       {roles.map((role) => {
         const assignmentCount = roleAssignments.filter((item) => item.role_id === role.id).length;
         return <article key={role.id}>
-          <span className="role-color" style={{ backgroundColor: role.color }} />
+          <RoleColorSwatch color={role.color} />
           <div>
             <strong>{role.name}</strong>
             <small>{role.builtin_key ? "Built-in role" : "Custom role"} · authority {role.authority_rank} · order {role.sort_position}</small>

@@ -59,6 +59,8 @@ export async function prepareImageForStorage({
     detectedType === "image/jpeg" ||
     detectedType === "image/png" ||
     detectedType === "image/webp";
+  const requiresProviderValidation = !needsLocalDimensions;
+  let providerDimensionsVerified = false;
   if (needsLocalDimensions && !dimensions) {
     throw new ImageValidationError("The image structure is malformed.");
   }
@@ -78,11 +80,18 @@ export async function prepareImageForStorage({
             "The image dimensions are too large. Use an image under 50 megapixels and 16,384 pixels per side.",
           );
         }
+        providerDimensionsVerified = true;
       }
     } catch (error) {
       if (error instanceof ImageValidationError) throw error;
-      // Local structure and signature validation still protect the private fallback path.
+      if (requiresProviderValidation) {
+        throw new ImageValidationError("Image dimensions could not be verified. Try this iPhone image again shortly or convert it to JPEG.");
+      }
+      // JPEG, PNG, and WebP retain locally verified dimensions on provider failure.
     }
+  }
+  if (requiresProviderValidation && !providerDimensionsVerified) {
+    throw new ImageValidationError("Image dimensions could not be verified. Try this iPhone image again shortly or convert it to JPEG.");
   }
 
   try {
@@ -101,6 +110,9 @@ export async function prepareImageForStorage({
       dimensions,
     };
   } catch (error) {
+    if (requiresProviderValidation) {
+      throw new ImageValidationError("This iPhone image could not be safely converted. Try again shortly or convert it to JPEG.");
+    }
     return {
       bytes,
       contentType: detectedType,

@@ -196,6 +196,11 @@ test("officer sees restricted channels while nonmembers discover no channel meta
 
 test("owner can create and assign a custom role, set role/member overrides, and read audit history", async ({ browser }, testInfo) => {
   const { context, page } = await pageFor(browser, "organizationOwner");
+  await page.addInitScript(() => {
+    const violations: string[] = [];
+    Object.assign(window, { __ceCspViolations: violations });
+    document.addEventListener("securitypolicyviolation", (event) => violations.push(`${event.violatedDirective}:${event.blockedURI}`));
+  });
   await page.goto(`/organizations/${e2eOrganization.slug}`);
   const mobileChannels = page.locator(".workspace-topbar button").first();
   if (await mobileChannels.isVisible()) {
@@ -204,6 +209,7 @@ test("owner can create and assign a custom role, set role/member overrides, and 
   }
   await page.getByRole("button", { name: "Workspace settings" }).evaluate((element: HTMLButtonElement) => element.click());
   await expect(page.getByRole("dialog", { name: /Roles, permissions & audit/ })).toBeVisible();
+  await expect(page.locator(".workspace-admin [style]")).toHaveCount(0);
 
   if (testInfo.project.name === "mobile-chromium") {
     const created = await context.request.put(`/api/v1/organizations/${e2eOrganization.slug}/roles`, {
@@ -214,6 +220,12 @@ test("owner can create and assign a custom role, set role/member overrides, and 
     expect(created.ok(), JSON.stringify(createdBody)).toBe(true);
   } else {
     await page.getByRole("button", { name: "Create custom role" }).click();
+    const permissionCheckbox = page.locator(".workspace-role-form input[type='checkbox']").first();
+    const checkboxSize = await permissionCheckbox.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return { width: Math.round(box.width), height: Math.round(box.height) };
+    });
+    expect(checkboxSize).toEqual({ width: 20, height: 20 });
     await page.getByLabel("Role name").fill(`Release Helper ${testInfo.project.name}`);
     await page.getByLabel("Authority rank").fill("20");
     await page.getByLabel("Display order").fill("70");
@@ -248,6 +260,7 @@ test("owner can create and assign a custom role, set role/member overrides, and 
   await page.getByRole("button", { name: "Audit history" }).click();
   await expect(page.getByRole("heading", { name: "Organization audit history" })).toBeVisible();
   await expect(page.locator(".workspace-audit article").first()).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __ceCspViolations: string[] }).__ceCspViolations.filter((value) => value.startsWith("style-src")))).toEqual([]);
   await context.close();
 });
 
@@ -364,7 +377,60 @@ test("authenticated shell has no serious accessibility violations", async ({ bro
   await context.close();
 });
 
+test("shared scope controls, institution selection, and sidebar geometry remain stable", async ({ browser }, testInfo) => {
+  const { context, page } = await pageFor(browser, "studentA");
+  const search = await context.request.get("/api/v1/institutions?q=Michigan%20State%20University&limit=5");
+  const payload = await search.json();
+  expect(search.ok(), JSON.stringify(payload)).toBe(true);
+  const selected = payload.data.items.find((item: { name: string }) => item.name === "Michigan State University");
+  expect(selected?.id).toBeTruthy();
+  await page.goto(`/people?institution=${encodeURIComponent(selected.id)}`);
+  await expect(page.getByRole("combobox", { name: "Institution" })).toHaveValue("Michigan State University");
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "Institution" })).toHaveValue("Michigan State University");
+  await page.getByRole("button", { name: "My institution" }).click();
+
+  const active = page.locator(".request-tabs .active").first();
+  for (const theme of ["light", "dark"] as const) {
+    await page.evaluate((value) => {
+      localStorage.setItem("campus-theme", value);
+      document.documentElement.dataset.theme = value;
+    }, theme);
+    const ratio = await active.evaluate((element) => {
+      const parse = (value: string) => value.match(/\d+(?:\.\d+)?/g)!.slice(0, 3).map(Number);
+      const luminance = (rgb: number[]) => {
+        const channels = rgb.map((value) => {
+          const normalized = value / 255;
+          return normalized <= .04045 ? normalized / 12.92 : ((normalized + .055) / 1.055) ** 2.4;
+        });
+        return .2126 * channels[0]! + .7152 * channels[1]! + .0722 * channels[2]!;
+      };
+      const style = getComputedStyle(element);
+      const foreground = luminance(parse(style.color));
+      const background = luminance(parse(style.backgroundColor));
+      return (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05);
+    });
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  }
+
+  const edge = page.locator(".sidebar-edge-control");
+  if (testInfo.project.name === "desktop-chromium") {
+    await expect(edge).toBeVisible();
+    const overlapsHeader = await page.evaluate(() => {
+      const control = document.querySelector(".sidebar-edge-control")!.getBoundingClientRect();
+      const header = document.querySelector(".page-header")?.getBoundingClientRect();
+      return Boolean(header && control.left < header.right && control.right > header.left && control.top < header.bottom && control.bottom > header.top);
+    });
+    expect(overlapsHeader).toBe(false);
+  } else {
+    await expect(edge).toBeHidden();
+  }
+  await expectResponsiveSurface(page);
+  await context.close();
+});
+
 test("campus and platform administrators receive complete role-scoped operations consoles", async ({ browser }, testInfo) => {
+  testInfo.setTimeout(60_000);
   const campus = await pageFor(browser, "campusAdministrator");
   await campus.page.goto("/admin");
   await expect(campus.page.getByRole("heading", { name: "Administration console" })).toBeVisible();
@@ -389,6 +455,9 @@ test("campus and platform administrators receive complete role-scoped operations
     await campus.page.goto("/admin?section=audit");
     await expect(campus.page.getByText("admin.restore").first()).toBeVisible();
   }
+  await campus.page.goto("/admin?section=users");
+  await expect(campus.page.locator(".managed-list[aria-label='Users'] article").first()).toBeVisible();
+  await expect(campus.page.locator(".managed-list[aria-label='Users']")).not.toContainText("University of Illinois");
   const campusAxe = await new AxeBuilder({ page: campus.page }).analyze();
   expect(campusAxe.violations.filter((item) => item.impact === "critical" || item.impact === "serious")).toEqual([]);
   await expectResponsiveSurface(campus.page);
@@ -402,6 +471,8 @@ test("campus and platform administrators receive complete role-scoped operations
   await expect(platform.page.locator(".admin-metric-grid a")).toHaveCount(8);
   await platform.page.goto("/admin?section=content");
   await expect(platform.page.getByLabel("Institution")).toBeVisible();
+  await platform.page.goto("/admin?section=users");
+  await expect(platform.page.locator(".managed-list[aria-label='Users'] article").first()).toBeVisible();
   const platformAxe = await new AxeBuilder({ page: platform.page }).analyze();
   expect(platformAxe.violations.filter((item) => item.impact === "critical" || item.impact === "serious")).toEqual([]);
   await expectResponsiveSurface(platform.page);

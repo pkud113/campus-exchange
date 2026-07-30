@@ -102,7 +102,12 @@ export function notificationEmailAllowed(preference: EmailPreference, category: 
   const start = preference?.quiet_hours_start;
   const end = preference?.quiet_hours_end;
   if (start == null || end == null) return true;
-  const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "2-digit", hourCycle: "h23", timeZone }).format(now));
+  let hour: number;
+  try {
+    hour = Number(new Intl.DateTimeFormat("en-US", { hour: "2-digit", hourCycle: "h23", timeZone }).format(now));
+  } catch {
+    hour = Number(new Intl.DateTimeFormat("en-US", { hour: "2-digit", hourCycle: "h23", timeZone: "UTC" }).format(now));
+  }
   const quiet = start < end ? hour >= start && hour < end : hour >= start || hour < end;
   return !quiet;
 }
@@ -116,6 +121,11 @@ async function canEmail(db: SupabaseClient, recipientId: string, category: Email
   if (profileResult.error) throw profileResult.error;
   const relation = profileResult.data?.campuses as unknown as { timezone?: string } | Array<{ timezone?: string }> | undefined;
   const timeZone = (Array.isArray(relation) ? relation[0]?.timezone : relation?.timezone) ?? "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format();
+  } catch {
+    console.error(JSON.stringify({ level: "error", event: "invalid_campus_timezone", recipientId, fallback: "UTC" }));
+  }
   return notificationEmailAllowed(preferenceResult.data, category, new Date(), timeZone);
 }
 
@@ -280,6 +290,8 @@ async function runBatch(env: Env): Promise<number> {
       console.error(JSON.stringify({ level: "error", event: "outbox_delivery_failed", outboxId: event.id, attempt: event.attempt_count, dead }));
     }
   }
+  const { error: heartbeatError } = await db.from("runtime_settings").upsert({ key: "worker_last_batch_at", value: new Date().toISOString() });
+  if (heartbeatError) throw heartbeatError;
   return processed;
 }
 
@@ -322,6 +334,8 @@ async function runMaintenance(env: Env) {
   if (enrollmentCleanupError && !["PGRST202","42883"].includes(enrollmentCleanupError.code ?? "")) throw enrollmentCleanupError;
   const { error: moderationPurgeError } = await db.rpc("purge_content_moderation_data", { batch_size: 100 });
   if (moderationPurgeError) throw moderationPurgeError;
+  const { error: heartbeatError } = await db.from("runtime_settings").upsert({ key: "worker_last_maintenance_at", value: new Date().toISOString() });
+  if (heartbeatError) throw heartbeatError;
 }
 
 export default {
@@ -329,17 +343,25 @@ export default {
   async fetch(request: Request, env: Env) {
     if (new URL(request.url).pathname !== "/health") return new Response("Not found", { status: 404 });
     const db = createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    const [database, pending, storage] = await Promise.allSettled([
+    const [database, pending, deadLetters, heartbeats, storage] = await Promise.allSettled([
       db.from("runtime_settings").select("key").limit(1),
       db.from("outbox_events").select("created_at").eq("status", "pending").order("created_at", { ascending: true }).limit(1).maybeSingle(),
+      db.from("outbox_events").select("id", { count: "exact", head: true }).eq("status", "dead_letter").gte("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString()),
+      db.from("runtime_settings").select("key,value").in("key", ["worker_last_batch_at", "worker_last_maintenance_at"]),
       env.MEDIA_BUCKET.head("__campus_exchange_healthcheck__")
     ]);
     const databaseHealthy = database.status === "fulfilled" && !database.value.error;
     const outboxHealthy = pending.status === "fulfilled" && !pending.value.error;
     const storageHealthy = storage.status === "fulfilled";
+    const deadLettersHealthy = deadLetters.status === "fulfilled" && !deadLetters.value.error && (deadLetters.value.count ?? 0) === 0;
+    const heartbeatRows = heartbeats.status === "fulfilled" && !heartbeats.value.error ? heartbeats.value.data ?? [] : [];
+    const heartbeatMap = new Map(heartbeatRows.map((row) => [row.key, typeof row.value === "string" ? row.value : ""]));
+    const batchHeartbeatAgeSeconds = heartbeatMap.get("worker_last_batch_at") ? Math.max(0, Math.floor((Date.now() - Date.parse(heartbeatMap.get("worker_last_batch_at")!)) / 1000)) : Number.POSITIVE_INFINITY;
+    const maintenanceHeartbeatAgeSeconds = heartbeatMap.get("worker_last_maintenance_at") ? Math.max(0, Math.floor((Date.now() - Date.parse(heartbeatMap.get("worker_last_maintenance_at")!)) / 1000)) : Number.POSITIVE_INFINITY;
+    const heartbeatHealthy = batchHeartbeatAgeSeconds < 300 && maintenanceHeartbeatAgeSeconds < 300;
     const oldest = outboxHealthy && pending.status === "fulfilled" ? pending.value.data?.created_at : null;
     const oldestPendingSeconds = oldest ? Math.max(0, Math.floor((Date.now() - Date.parse(oldest)) / 1000)) : 0;
-    const healthy = databaseHealthy && outboxHealthy && storageHealthy && oldestPendingSeconds < 900;
-    return Response.json({ status: healthy ? "ok" : "degraded", service: "campus-exchange-worker", checks: { database: databaseHealthy, outbox: outboxHealthy, objectStorage: storageHealthy, oldestPendingSeconds } }, { status: healthy ? 200 : 503, headers: { "cache-control": "no-store" } });
+    const healthy = databaseHealthy && outboxHealthy && deadLettersHealthy && heartbeatHealthy && storageHealthy && oldestPendingSeconds < 900;
+    return Response.json({ status: healthy ? "ok" : "degraded", service: "campus-exchange-worker", checks: { database: databaseHealthy, outbox: outboxHealthy, recentDeadLetters: deadLettersHealthy, scheduledBatch: batchHeartbeatAgeSeconds < 300, maintenance: maintenanceHeartbeatAgeSeconds < 300, objectStorage: storageHealthy, oldestPendingSeconds } }, { status: healthy ? 200 : 503, headers: { "cache-control": "no-store" } });
   }
 } satisfies ExportedHandler<Env>;
