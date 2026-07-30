@@ -194,7 +194,7 @@ jobs:
             curl --fail-with-body --silent --show-error \
               --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
               "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/database/pooler" \
-              | jq -er '.connection_string | select(type == "string" and length > 0)'
+              | jq -er '.[] | select(.database_type == "PRIMARY") | .connection_string | select(type == "string" and length > 0)'
           )"
           pooler_host="$(
             node -e '
