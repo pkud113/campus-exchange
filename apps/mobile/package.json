@@ -16,5 +16,5 @@
     "@campus-exchange/shared-types": "workspace:*",
     "@campus-exchange/validation": "workspace:*"
   },
-  "devDependencies": { "typescript": "^5.8.3", "vitest": "^3.2.4" }
+  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.10" }
 }
