@@ -31,16 +31,16 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
-    "@axe-core/playwright": "^4.12.1",
-    "@cloudflare/workers-types": "^5.20260708.1",
-    "@playwright/test": "^1.61.1",
-    "@types/node": "^22.15.0",
+    "@axe-core/playwright": "^4.13.0",
+    "@cloudflare/workers-types": "^5.20260814.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.2.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "eslint": "^9.39.5",
-    "eslint-config-next": "15.5.7",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.110.0"
+    "eslint": "^10.8.1",
+    "eslint-config-next": "16.3.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.123.0"
   }
 }
